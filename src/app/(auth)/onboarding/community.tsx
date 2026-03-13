@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Platform,
+  Image,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -40,6 +41,7 @@ interface EventCardProps {
   memberCount: number;
   delay: number;
   bgColors: readonly [string, string];
+  bgImage?: ReturnType<typeof require>;
 }
 
 function EventCard({
@@ -51,6 +53,7 @@ function EventCard({
   memberCount,
   delay,
   bgColors,
+  bgImage,
 }: EventCardProps) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
@@ -80,9 +83,17 @@ function EventCard({
         { opacity: fadeAnim, transform: [{ translateX: slideAnim }] },
       ]}
     >
-      <LinearGradient colors={bgColors} style={s.eventCardBg} />
+      {bgImage ? (
+        <Image
+          source={bgImage}
+          style={{ width: "100%", height: "100%", position: "absolute" }}
+          resizeMode="cover"
+        />
+      ) : (
+        <LinearGradient colors={bgColors} style={s.eventCardBg} />
+      )}
       <LinearGradient
-        colors={["transparent", "rgba(8,8,20,0.8)"]}
+        colors={["transparent", "rgba(8,8,20,0.85)"]}
         style={StyleSheet.absoluteFillObject}
       />
 
@@ -185,6 +196,7 @@ export default function CommunityScreen() {
               memberCount={24}
               delay={200}
               bgColors={["#2D1060", "#1A0A40"]}
+              bgImage={require("../../../assets/images/golden-hour.jpg")}
             />
             <EventCard
               title="Sortie Urbaine"
@@ -195,6 +207,7 @@ export default function CommunityScreen() {
               memberCount={12}
               delay={350}
               bgColors={["#1A2060", "#0A1040"]}
+              bgImage={require("../../../assets/images/urban-street.jpg")}
             />
           </ScrollView>
         </View>

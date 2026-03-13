@@ -22,6 +22,7 @@ import { useRouter } from "expo-router";
 import { navigate } from "@/utils/navigation";
 import { useAuthStore } from "../../stores/authStore";
 import { usePhotos } from "../../hooks/usePhotos";
+import { useDailyTip } from "../../hooks/useDailyTip";
 
 // Card background images
 const CARD_IMAGES = {
@@ -128,14 +129,26 @@ const mc = StyleSheet.create({
   },
 });
 
+// Category labels for display
+const CATEGORY_LABELS: Record<string, string> = {
+  composition: "Composition",
+  lumiere: "Lumière",
+  couleur: "Couleur",
+  technique: "Technique",
+  creativite: "Créativité",
+};
+
 // Conseil du jour modal
 interface ConseilModalProps {
   visible: boolean;
   onClose: () => void;
   onTry: () => void;
+  tip?: string;
+  category?: string;
+  isLoading?: boolean;
 }
 
-function ConseilModal({ visible, onClose, onTry }: ConseilModalProps) {
+function ConseilModal({ visible, onClose, onTry, tip, category, isLoading }: ConseilModalProps) {
   const slideAnim = useRef(new Animated.Value(300)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -190,10 +203,23 @@ function ConseilModal({ visible, onClose, onTry }: ConseilModalProps) {
             <Icon name="x" size={16} color={Colors.textPrimary} />
           </TouchableOpacity>
           <Text style={cm.title}>Conseil du jour</Text>
-          <Text style={cm.body}>
-            Utilisez la règle des tiers pour des{"\n"}compositions plus
-            dynamiques
-          </Text>
+          {category && CATEGORY_LABELS[category] && (
+            <View style={cm.categoryBadge}>
+              <Text style={cm.categoryText}>
+                {CATEGORY_LABELS[category]}
+              </Text>
+            </View>
+          )}
+          {isLoading ? (
+            <View style={cm.loadingWrap}>
+              <View style={cm.shimmerLine} />
+              <View style={[cm.shimmerLine, { width: "60%" }]} />
+            </View>
+          ) : (
+            <Text style={cm.body}>
+              {tip || "Utilisez la règle des tiers pour des compositions plus dynamiques."}
+            </Text>
+          )}
           <TouchableOpacity
             style={cm.tryBtn}
             activeOpacity={0.85}
@@ -246,6 +272,28 @@ const cm = StyleSheet.create({
     color: Colors.textPrimary,
     textAlign: "center",
   },
+  categoryBadge: {
+    backgroundColor: "rgba(255,255,255,0.15)",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  categoryText: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  loadingWrap: {
+    alignItems: "center",
+    gap: 8,
+    width: "100%",
+  },
+  shimmerLine: {
+    width: "80%",
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "rgba(255,255,255,0.15)",
+  },
   body: {
     fontFamily: Fonts.regular,
     fontSize: 16,
@@ -285,6 +333,7 @@ export default function HomeScreen() {
     [user?.username],
   );
   const [showConseil, setShowConseil] = useState(false);
+  const { data: dailyTip, isLoading: tipLoading } = useDailyTip();
   const headerFade = useRef(new Animated.Value(0)).current;
 
   // ── Dynamic quest progress from real photo data ──
@@ -449,6 +498,9 @@ export default function HomeScreen() {
         visible={showConseil}
         onClose={handleCloseConseil}
         onTry={handleTryConseil}
+        tip={dailyTip?.tip}
+        category={dailyTip?.category}
+        isLoading={tipLoading}
       />
     </View>
   );

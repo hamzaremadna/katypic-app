@@ -17,6 +17,7 @@ import {
 } from "@expo-google-fonts/montserrat";
 import { useAuthStore } from "../stores/authStore";
 import { useSettingsStore } from "../stores/settingsStore";
+import { useOnboardingStore } from "../stores/onboardingStore";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 
 // Init Sentry before anything renders
@@ -44,6 +45,7 @@ const queryClient = new QueryClient({
 function RootLayout() {
   const loadToken = useAuthStore((s) => s.loadToken);
   const isReady = useAuthStore((s) => s.isReady);
+  const onboardingLoaded = useOnboardingStore((s) => s.loaded);
 
   const [fontsLoaded] = useFonts({
     Montserrat_300Light,
@@ -58,16 +60,17 @@ function RootLayout() {
   useEffect(() => {
     loadToken();
     useSettingsStore.getState().load();
+    useOnboardingStore.getState().load();
   }, [loadToken]);
 
-  // Hide splash only when both fonts AND auth are ready
+  // Hide splash only when fonts, auth AND onboarding state are ready
   const onLayoutReady = useCallback(async () => {
-    if (fontsLoaded && isReady) {
+    if (fontsLoaded && isReady && onboardingLoaded) {
       await SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, isReady]);
+  }, [fontsLoaded, isReady, onboardingLoaded]);
 
-  if (!fontsLoaded || !isReady) return null;
+  if (!fontsLoaded || !isReady || !onboardingLoaded) return null;
 
   return (
     <ErrorBoundary>

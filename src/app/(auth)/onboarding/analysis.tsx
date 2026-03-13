@@ -77,10 +77,7 @@ function StatCard({ icon, value, label, delay }: StatCardProps) {
 
   return (
     <Animated.View
-      style={[
-        styles.statCard,
-        { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-      ]}
+      style={[styles.statCard, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
     >
       <LinearGradient
         colors={["rgba(26,26,50,0.9)", "rgba(15,15,30,0.95)"]}
@@ -131,7 +128,7 @@ export default function AnalysisScreen() {
           duration: 2000,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
   }, []);
 
@@ -151,22 +148,15 @@ export default function AnalysisScreen() {
         style={StyleSheet.absoluteFillObject}
       />
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Header */}
         <Animated.View style={[styles.header, { opacity: headerFade }]}>
           <Text style={styles.title}>Analyser une photo</Text>
-          <Text style={styles.subtitle}>
-            Importez une photo pour l'analyser ...
-          </Text>
+          <Text style={styles.subtitle}>Importez une photo pour l'analyser ...</Text>
         </Animated.View>
 
         {/* Photo comparison card */}
-        <Animated.View
-          style={[styles.photoCard, { transform: [{ scale: photoPulse }] }]}
-        >
+        <Animated.View style={[styles.photoCard, { transform: [{ scale: photoPulse }] }]}>
           <LinearGradient
             colors={["rgba(26,26,50,0.95)", "rgba(15,15,30,0.98)"]}
             style={styles.photoCardInner}
@@ -176,25 +166,13 @@ export default function AnalysisScreen() {
 
             {/* Main photo area (AFTER) */}
             <View style={styles.photoAfterArea}>
-              <LinearGradient
-                colors={["#1A1A3E", "#2D1060", "#1A0A2E"]}
-                style={StyleSheet.absoluteFillObject}
-              />
-              {/* Simulated street photo with tones */}
-              <LinearGradient
-                colors={[
-                  "transparent",
-                  "rgba(80,40,140,0.4)",
-                  "rgba(200,140,60,0.3)",
-                ]}
-                style={StyleSheet.absoluteFillObject}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
+              <Image
+                source={require("../../../assets/images/analyser.jpg")}
+                style={{ width: "100%", height: "100%" }}
+                resizeMode="cover"
               />
               {/* OPTIMISÉ badge */}
-              <Animated.View
-                style={[styles.optimisedBadge, { opacity: badgeFade }]}
-              >
+              <Animated.View style={[styles.optimisedBadge, { opacity: badgeFade }]}>
                 <LinearGradient
                   colors={Gradients.brandReverse}
                   style={styles.optimisedBadgeGradient}
@@ -209,9 +187,10 @@ export default function AnalysisScreen() {
 
             {/* AVANT thumbnail */}
             <View style={styles.beforeThumb}>
-              <LinearGradient
-                colors={["#0D0D20", "#1A1A30"]}
-                style={StyleSheet.absoluteFillObject}
+              <Image
+                source={require("../../../assets/images/analyser.jpg")}
+                style={{ width: "100%", height: "100%", opacity: 0.6 }}
+                resizeMode="cover"
               />
               <Text style={styles.beforeLabel}>AVANT</Text>
             </View>
@@ -252,11 +231,7 @@ export default function AnalysisScreen() {
         </Animated.View>
 
         {/* Next button */}
-        <GradientButton
-          label="Suivant"
-          onPress={handleNext}
-          style={styles.cta}
-        />
+        <GradientButton label="Suivant" onPress={handleNext} style={styles.cta} />
       </ScrollView>
     </View>
   );

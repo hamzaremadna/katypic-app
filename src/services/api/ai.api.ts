@@ -32,7 +32,14 @@ export interface Preset {
   isSystem: boolean;
 }
 
+export interface DailyTip {
+  tip: string;
+  category: string;
+}
+
 export const aiApi = {
+  getDailyTip: () => api.get<DailyTip>("/ai/daily-tip"),
+
   analyzePhoto: (photoId: string, imageUrl: string) =>
     api.post<PhotoAnalysis>("/ai/analyze", { photoId, imageUrl }),
 

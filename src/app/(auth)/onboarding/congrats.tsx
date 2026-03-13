@@ -15,6 +15,7 @@ import { StatusBar } from "expo-status-bar";
 import { Colors, Gradients } from "../../../theme/colors";
 import { Fonts } from "../../../theme/typography";
 import { Icon } from "../../../components/ui/Icon";
+import { useOnboardingStore } from "../../../stores/onboardingStore";
 
 const { width, height } = Dimensions.get("window");
 
@@ -31,8 +32,13 @@ function FeatureIcon({ icon, label }: { icon: string; label: string }) {
 
 export default function CongratsScreen() {
   const router = useRouter();
+  const markDone = useOnboardingStore((s) => s.markDone);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
+
+  useEffect(() => {
+    markDone();
+  }, []);
 
   useEffect(() => {
     Animated.parallel([

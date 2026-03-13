@@ -286,43 +286,29 @@ export default function AnalyseImportScreen() {
       >
         <KaytiHeader showSettings showBack title="Analyser une photo" />
 
-        {/* Hero banner */}
-        <Animated.View style={[s.heroBanner, { opacity: headerFade }]}>
-          <LinearGradient
-            colors={["#2D1060", "#1A0840", "#0A0820"]}
-            style={StyleSheet.absoluteFillObject}
-          />
-          <LinearGradient
-            colors={["transparent", "rgba(8,8,20,0.8)"]}
-            style={StyleSheet.absoluteFillObject}
-          />
-          <View style={s.heroContent}>
-            <Icon name="camera" size={28} color={Colors.textPrimary} />
-            <Text style={s.heroTitle}>Analyser une photo</Text>
-            <Text style={s.heroSub}>
-              Importez une photo pour{"\n"}l'analyser ...
-            </Text>
-          </View>
+        {/* Subtitle */}
+        <Animated.View style={[s.subtitleWrap, { opacity: headerFade }]}>
+          <Text style={s.subtitle}>
+            Importez une photo pour l'annalyser ...
+          </Text>
         </Animated.View>
 
-        {/* Import button */}
+        {/* Import card — centered vertical */}
         <TouchableOpacity
-          style={s.importBtn}
+          style={s.importCard}
           activeOpacity={0.85}
           onPress={() => pickImageAndAnalyse(router)}
         >
           <LinearGradient
-            colors={Gradients.purpleBlue}
-            style={s.importBtnInner}
+            colors={["#2A1565", "#1A0E55", "#120A3A"]}
+            style={StyleSheet.absoluteFillObject}
             start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          >
-            <Icon name="upload" size={24} color="#fff" />
-            <View>
-              <Text style={s.importLabel}>Importer depuis la galerie</Text>
-              <Text style={s.importSub}>Sélectionnez une photo à analyser</Text>
-            </View>
-          </LinearGradient>
+            end={{ x: 1, y: 1 }}
+          />
+          <View style={s.importCardBorder} />
+          <Icon name="upload" size={28} color="#fff" />
+          <Text style={s.importLabel}>Importer depuis la galerie</Text>
+          <Text style={s.importSub}>Sélectionnez une photo à analyser</Text>
         </TouchableOpacity>
 
         {/* Action buttons */}
@@ -335,7 +321,7 @@ export default function AnalyseImportScreen() {
               colors={Gradients.purpleBlue}
               style={s.actionBtnGradient}
             >
-              <Text style={s.actionBtnText}>Prendre une photo</Text>
+              <Text style={s.actionBtnText}>Prendre une  photo</Text>
             </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity
@@ -343,7 +329,7 @@ export default function AnalyseImportScreen() {
             onPress={() => pickImageAndAnalyse(router)}
           >
             <Text style={s.actionBtnTextDark}>
-              Importer à partir de l'application
+              Importer  à partir de l'application
             </Text>
           </TouchableOpacity>
         </View>
@@ -352,20 +338,25 @@ export default function AnalyseImportScreen() {
         <View style={s.recentSection}>
           <View style={s.recentHeader}>
             <Text style={s.sectionTitle}>Photos récentes</Text>
-            <TouchableOpacity
-              style={s.aiSelectBtn}
-              onPress={() => setShowAIModal(true)}
-            >
-              <LinearGradient
-                colors={Gradients.redPink}
-                style={s.aiSelectBtnGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
+            <View style={s.recentHeaderRight}>
+              <TouchableOpacity
+                style={s.aiSelectBtn}
+                onPress={() => setShowAIModal(true)}
               >
-                <Icon name="sparkles" size={12} color="#fff" />
-                <Text style={s.aiSelectBtnText}>Sélection IA</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+                <LinearGradient
+                  colors={Gradients.redPink}
+                  style={s.aiSelectBtnGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <Icon name="sparkles" size={12} color="#fff" />
+                  <Text style={s.aiSelectBtnText}>Sélection IA</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.gridIconBtn}>
+                <Icon name="grid" size={20} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {recentPhotos.length === 0 ? (
@@ -377,10 +368,62 @@ export default function AnalyseImportScreen() {
             </View>
           ) : (
             <View style={s.photoGrid}>
-              {recentPhotos.map((photo, i) => (
+              {/* First photo — large on left */}
+              <TouchableOpacity
+                style={s.photoCellLarge}
+                onPress={() =>
+                  handlePhotoPress(recentPhotos[0].id, recentPhotos[0].url)
+                }
+                activeOpacity={0.85}
+              >
+                <RNImage
+                  source={{ uri: recentPhotos[0].url }}
+                  style={StyleSheet.absoluteFillObject}
+                  resizeMode="cover"
+                />
+                {recentPhotos[0].analyses &&
+                  recentPhotos[0].analyses.length > 0 && (
+                    <View style={s.photoTag}>
+                      <Text style={s.photoTagText}>
+                        Score: {recentPhotos[0].analyses[0].overallScore}
+                      </Text>
+                    </View>
+                  )}
+              </TouchableOpacity>
+              {/* Right column — stacked */}
+              <View style={s.photoColRight}>
+                {recentPhotos.slice(1, 3).map((photo) => (
+                  <TouchableOpacity
+                    key={photo.id}
+                    style={s.photoCell}
+                    onPress={() => handlePhotoPress(photo.id, photo.url)}
+                    activeOpacity={0.85}
+                  >
+                    <RNImage
+                      source={{ uri: photo.url }}
+                      style={StyleSheet.absoluteFillObject}
+                      resizeMode="cover"
+                    />
+                    {photo.analyses && photo.analyses.length > 0 && (
+                      <View style={s.photoTag}>
+                        <Text style={s.photoTagText}>
+                          Score: {photo.analyses[0].overallScore}
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Additional photos row */}
+          {recentPhotos.length > 3 && (
+            <View style={s.photoRow}>
+              {recentPhotos.slice(3, 5).map((photo) => (
                 <TouchableOpacity
                   key={photo.id}
-                  style={[s.photoCell, i === 0 && s.photoCellLarge]}
+                  style={s.photoCellSmall}
                   onPress={() => handlePhotoPress(photo.id, photo.url)}
                   activeOpacity={0.85}
                 >
@@ -389,13 +432,6 @@ export default function AnalyseImportScreen() {
                     style={StyleSheet.absoluteFillObject}
                     resizeMode="cover"
                   />
-                  {photo.analyses && photo.analyses.length > 0 && (
-                    <View style={s.photoTag}>
-                      <Text style={s.photoTagText}>
-                        Score: {photo.analyses[0].overallScore}
-                      </Text>
-                    </View>
-                  )}
                 </TouchableOpacity>
               ))}
             </View>
@@ -433,35 +469,35 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bgDeep },
   scroll: { paddingBottom: 20, gap: 16 },
 
-  heroBanner: {
-    height: 100,
+  subtitleWrap: { paddingHorizontal: 20 },
+  subtitle: { fontSize: 15, color: Colors.textSecondary },
+
+  // Import card — centered vertical
+  importCard: {
     marginHorizontal: 20,
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 28,
+    gap: 8,
     position: "relative",
-    justifyContent: "flex-end",
   },
-  heroContent: {
-    padding: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
+  importCardBorder: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: "rgba(123,47,190,0.5)",
+    zIndex: 2,
   },
-  heroIcon: { fontSize: 28 },
-  heroTitle: { fontSize: 20, fontWeight: "900", color: Colors.textPrimary },
-  heroSub: { fontSize: 13, color: Colors.textSecondary },
-
-  importBtn: { marginHorizontal: 20, borderRadius: 16, overflow: "hidden" },
-  importBtnInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-    padding: 20,
-  },
-  importIcon: { fontSize: 24, color: "#fff" },
   importLabel: { fontSize: 16, fontWeight: "800", color: "#fff" },
-  importSub: { fontSize: 13, color: "rgba(255,255,255,0.7)", marginTop: 2 },
+  importSub: { fontSize: 13, color: "rgba(255,255,255,0.6)" },
 
+  // Action buttons
   actionBtns: { paddingHorizontal: 20, gap: 10 },
   actionBtn: { borderRadius: 50, overflow: "hidden" },
   actionBtnGradient: {
@@ -483,39 +519,72 @@ const s = StyleSheet.create({
     fontWeight: "600",
   },
 
+  // Recent photos section
   recentSection: { paddingHorizontal: 20, gap: 14 },
   recentHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  sectionTitle: { fontSize: 18, fontWeight: "800", color: Colors.textPrimary },
+  recentHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  sectionTitle: { fontSize: 20, fontWeight: "800", color: Colors.textPrimary },
   aiSelectBtn: { borderRadius: 20, overflow: "hidden" },
   aiSelectBtnGradient: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 7,
-    paddingHorizontal: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     gap: 5,
   },
-  aiSelectBtnIcon: { color: "#fff", fontSize: 12 },
-  aiSelectBtnText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  aiSelectBtnText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  gridIconBtn: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
+  // Photo grid — first large left, 2 stacked right
   photoGrid: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 8,
   },
-  photoCell: {
-    width: (width - 56) / 2,
-    height: 140,
+  photoCellLarge: {
+    flex: 1,
+    height: 290,
     borderRadius: 14,
     overflow: "hidden",
     position: "relative",
     backgroundColor: Colors.bgCard,
   },
-  photoCellLarge: {
-    height: 180,
+  photoColRight: {
+    flex: 1,
+    gap: 8,
+  },
+  photoCell: {
+    flex: 1,
+    borderRadius: 14,
+    overflow: "hidden",
+    position: "relative",
+    backgroundColor: Colors.bgCard,
+  },
+  photoRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 8,
+    paddingHorizontal: 20,
+  },
+  photoCellSmall: {
+    flex: 1,
+    height: 140,
+    borderRadius: 14,
+    overflow: "hidden",
+    position: "relative",
+    backgroundColor: Colors.bgCard,
   },
   photoTag: {
     position: "absolute",
@@ -526,7 +595,6 @@ const s = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 10,
   },
-  photoTagRed: { backgroundColor: Colors.accentRed },
   photoTagText: { color: "#fff", fontSize: 10, fontWeight: "700" },
 
   // Empty recent photos

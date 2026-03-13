@@ -19,13 +19,7 @@ import { Icon } from "../../../components/ui/Icon";
 const { width, height } = Dimensions.get("window");
 
 // Map camera marker
-function CameraMarker({
-  color = "#7B2FBE",
-  size = 36,
-}: {
-  color?: string;
-  size?: number;
-}) {
+function CameraMarker({ color = "#7B2FBE", size = 36 }: { color?: string; size?: number }) {
   return (
     <View
       style={[
@@ -51,6 +45,7 @@ interface SpotCardProps {
   bestTime?: string;
   idealFor?: string;
   thumbnailGradient: readonly [string, string];
+  thumbnailImage?: ReturnType<typeof require>;
   delay: number;
 }
 
@@ -62,6 +57,7 @@ function SpotCard({
   bestTime,
   idealFor,
   thumbnailGradient,
+  thumbnailImage,
   delay,
 }: SpotCardProps) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -89,17 +85,19 @@ function SpotCard({
 
   return (
     <Animated.View
-      style={[
-        styles.spotCard,
-        { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-      ]}
+      style={[styles.spotCard, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
     >
       {/* Thumbnail */}
       <View style={styles.spotThumbnail}>
-        <LinearGradient
-          colors={thumbnailGradient}
-          style={StyleSheet.absoluteFillObject}
-        />
+        {thumbnailImage ? (
+          <Image
+            source={thumbnailImage}
+            style={{ width: "100%", height: "100%" }}
+            resizeMode="cover"
+          />
+        ) : (
+          <LinearGradient colors={thumbnailGradient} style={StyleSheet.absoluteFillObject} />
+        )}
       </View>
 
       {/* Info */}
@@ -113,9 +111,7 @@ function SpotCard({
           <Text style={styles.spotReviews}>({reviewCount})</Text>
         </View>
         <Text style={styles.spotDetail}>
-          {bestTime
-            ? `Meilleur moment: ${bestTime}`
-            : `Idéal pour: ${idealFor}`}
+          {bestTime ? `Meilleur moment: ${bestTime}` : `Idéal pour: ${idealFor}`}
         </Text>
       </View>
     </Animated.View>
@@ -161,17 +157,14 @@ export default function SpotsScreen() {
         style={StyleSheet.absoluteFillObject}
       />
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Header */}
         <Animated.View style={[styles.header, { opacity: headerFade }]}>
           {/* KaytiPic logo top bar */}
-          <View style={styles.logoBar}>
+          {/* <View style={styles.logoBar}>
             <Text style={styles.logoKayti}>Kayti</Text>
             <Text style={styles.logoPic}>Pic</Text>
-          </View>
+          </View> */}
           <Text style={styles.title}>Découvrez les{"\n"}meilleurs spots</Text>
           <Text style={styles.subtitle}>
             Des milliers de spots photo{"\n"}géolocalisés près de chez vous
@@ -180,41 +173,12 @@ export default function SpotsScreen() {
 
         {/* Map card */}
         <Animated.View style={[styles.mapCard, { opacity: mapFade }]}>
-          <LinearGradient
-            colors={["#1A1A3E", "#2D1060", "#0D1A3E"]}
-            style={styles.mapInner}
-          >
-            {/* Simulated map tiles */}
-            <LinearGradient
-              colors={[
-                "rgba(40,60,100,0.6)",
-                "rgba(60,40,120,0.4)",
-                "rgba(20,40,80,0.7)",
-              ]}
-              style={StyleSheet.absoluteFillObject}
+          <View style={styles.mapInner}>
+            <Image
+              source={require("../../../assets/images/decouverte.jpg")}
+              style={{ width: "100%", height: "100%" }}
+              resizeMode="cover"
             />
-
-            {/* Grid lines (map streets) */}
-            {[0.2, 0.45, 0.7].map((y, i) => (
-              <View
-                key={`h${i}`}
-                style={[
-                  styles.mapLine,
-                  styles.mapLineH,
-                  { top: `${y * 100}%` },
-                ]}
-              />
-            ))}
-            {[0.15, 0.4, 0.6, 0.82].map((x, i) => (
-              <View
-                key={`v${i}`}
-                style={[
-                  styles.mapLine,
-                  styles.mapLineV,
-                  { left: `${x * 100}%` },
-                ]}
-              />
-            ))}
 
             {/* Camera markers */}
             <View style={[styles.markerWrapper, { top: "20%", left: "25%" }]}>
@@ -226,7 +190,7 @@ export default function SpotsScreen() {
             <View style={[styles.markerWrapper, { top: "35%", right: "15%" }]}>
               <CameraMarker color="#6B1FA0" size={28} />
             </View>
-          </LinearGradient>
+          </View>
         </Animated.View>
 
         {/* Spot list */}
@@ -237,6 +201,7 @@ export default function SpotsScreen() {
           reviewCount={234}
           bestTime="18h-19h"
           thumbnailGradient={["#FF6B35", "#E91E8C"]}
+          thumbnailImage={require("../../../assets/images/mont.png")}
           delay={200}
         />
         <SpotCard
@@ -246,36 +211,28 @@ export default function SpotsScreen() {
           reviewCount={156}
           idealFor="Street photo"
           thumbnailGradient={["#7B2FBE", "#2D1A69"]}
+          thumbnailImage={require("../../../assets/images/centre.png")}
           delay={350}
         />
 
         {/* Features list */}
         <Animated.View style={[styles.featuresList, { opacity: headerFade }]}>
-          {[
-            "+5000 spots répertoriés",
-            "Notés par la communauté",
-            "Horaires optimaux IA",
-          ].map((text, i) => (
-            <View key={i} style={styles.featureRow}>
-              <View style={styles.featureCheckCircle}>
-                <LinearGradient
-                  colors={Gradients.purpleBlue}
-                  style={styles.featureCheckGradient}
-                >
-                  <Icon name="check" size={13} color="#FFFFFF" />
-                </LinearGradient>
+          {["+5000 spots répertoriés", "Notés par la communauté", "Horaires optimaux IA"].map(
+            (text, i) => (
+              <View key={i} style={styles.featureRow}>
+                <View style={styles.featureCheckCircle}>
+                  <LinearGradient colors={Gradients.purpleBlue} style={styles.featureCheckGradient}>
+                    <Icon name="check" size={13} color="#FFFFFF" />
+                  </LinearGradient>
+                </View>
+                <Text style={styles.featureText}>{text}</Text>
               </View>
-              <Text style={styles.featureText}>{text}</Text>
-            </View>
-          ))}
+            ),
+          )}
         </Animated.View>
 
         {/* Next button */}
-        <GradientButton
-          label="Suivant"
-          onPress={handleNext}
-          style={styles.cta}
-        />
+        <GradientButton label="Suivant" onPress={handleNext} style={styles.cta} />
       </ScrollView>
     </View>
   );
