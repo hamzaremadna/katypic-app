@@ -16,8 +16,8 @@ import {
   Dimensions,
   Animated,
   Platform,
+  Image,
 } from "react-native";
-import Svg, { Path, Circle } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
 import { Colors, Gradients } from "../../theme/colors";
 
@@ -46,71 +46,9 @@ interface Props {
 const CARD_W = W - 48;
 const CARD_H = 100; // approximate
 
-// ─── Compute SVG cubic bezier path ───────────────────────
-function arrowPath(step: TourStep): string {
-  const tipX = step.arrowTipX * W;
-  const tipY = step.arrowTipY * H;
-
-  // Card center
-  const cardCX = W / 2;
-  const cardCY = step.tooltipY * H;
-
-  // Arrow origin on card edge
-  let ox = cardCX;
-  let oy = cardCY;
-  switch (step.arrowSide) {
-    case "top":
-      oy = cardCY - CARD_H / 2 - 6;
-      ox = cardCX + (tipX - cardCX) * 0.3;
-      break;
-    case "bottom":
-      oy = cardCY + CARD_H / 2 + 6;
-      ox = cardCX + (tipX - cardCX) * 0.3;
-      break;
-    case "left":
-      ox = cardCX - CARD_W / 2 - 6;
-      oy = cardCY + (tipY - cardCY) * 0.3;
-      break;
-    case "right":
-      ox = cardCX + CARD_W / 2 + 6;
-      oy = cardCY + (tipY - cardCY) * 0.3;
-      break;
-  }
-
-  // Control points — push them outward for a nice curve
-  const dx = tipX - ox;
-  const dy = tipY - oy;
-  const cp1x = ox + dx * 0.15 + dy * 0.35;
-  const cp1y = oy + dy * 0.15 - dx * 0.35;
-  const cp2x = tipX - dx * 0.15 + dy * 0.2;
-  const cp2y = tipY - dy * 0.15 - dx * 0.2;
-
-  return `M ${ox} ${oy} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${tipX} ${tipY}`;
-}
-
-// ─── Arrowhead polygon points ─────────────────────────────
-function arrowHead(step: TourStep): string {
-  const tipX = step.arrowTipX * W;
-  const tipY = step.arrowTipY * H;
-  const cardCX = W / 2;
-  const cardCY = step.tooltipY * H;
-
-  // Approximate tangent at the tip
-  const dx = tipX - cardCX;
-  const dy = tipY - cardCY;
-  const len = Math.sqrt(dx * dx + dy * dy) || 1;
-  const ux = dx / len;
-  const uy = dy / len;
-
-  const size = 10;
-  // Two base points perpendicular to the direction
-  const bx1 = tipX - ux * size + uy * size * 0.5;
-  const by1 = tipY - uy * size - ux * size * 0.5;
-  const bx2 = tipX - ux * size - uy * size * 0.5;
-  const by2 = tipY - uy * size + ux * size * 0.5;
-
-  return `M ${tipX} ${tipY} L ${bx1} ${by1} L ${bx2} ${by2} Z`;
-}
+const ARROW_IMG = require("../../assets/images/arrow.png");
+const ARROW_W = 72;
+const ARROW_H = 108;
 
 // ─── Main component ───────────────────────────────────────
 export function TourOverlay({ steps, tourTitle, visible, onFinish }: Props) {
@@ -154,18 +92,48 @@ export function TourOverlay({ steps, tourTitle, visible, onFinish }: Props) {
     setStepIndex(0);
   }, [onFinish]);
 
-  // Memoize expensive SVG path calculations
-  const { path, head, clampedCardTop } = useMemo(() => {
+  const clampedCardTop = useMemo(() => {
     const cardTop = step.tooltipY * H - CARD_H / 2;
-    return {
-      path: arrowPath(step),
-      head: arrowHead(step),
-      clampedCardTop: Math.max(
-        Platform.OS === "ios" ? 60 : 40,
-        Math.min(H - CARD_H - 100, cardTop),
-      ),
-    };
+    return Math.max(
+      Platform.OS === "ios" ? 60 : 40,
+      Math.min(H - CARD_H - 100, cardTop),
+    );
   }, [step]);
+
+  // Compute PNG arrow position & rotation based on arrowSide
+  const arrowImageStyle = useMemo(() => {
+    const tipX = step.arrowTipX * W;
+    let top: number;
+    let left: number;
+    let rotation: string;
+    let scaleX = 1;
+
+    switch (step.arrowSide) {
+      case "bottom":
+        rotation = "0deg";
+        top = clampedCardTop + CARD_H + 6;
+        left = Math.max(8, Math.min(W - ARROW_W - 8, tipX - ARROW_W * 0.45));
+        break;
+      case "top":
+        rotation = "180deg";
+        top = clampedCardTop - ARROW_H - 6;
+        left = Math.max(8, Math.min(W - ARROW_W - 8, tipX - ARROW_W * 0.45));
+        break;
+      case "left":
+        rotation = "90deg";
+        scaleX = -1;
+        top = clampedCardTop + CARD_H / 2 - ARROW_W / 2;
+        left = 24 - ARROW_H * 0.5;
+        break;
+      case "right":
+      default:
+        rotation = "-90deg";
+        top = clampedCardTop + CARD_H / 2 - ARROW_W / 2;
+        left = W - 24 - ARROW_H * 0.5;
+        break;
+    }
+    return { top, left, rotation, scaleX };
+  }, [step, clampedCardTop]);
 
   if (!visible) return null;
 
@@ -177,50 +145,31 @@ export function TourOverlay({ steps, tourTitle, visible, onFinish }: Props) {
       {/* ── Dark backdrop ── */}
       <View style={s.backdrop} pointerEvents="none" />
 
-      {/* ── SVG Arrow ── */}
-      <Svg
-        width={W}
-        height={H}
-        style={StyleSheet.absoluteFillObject}
+      {/* ── Handwritten Arrow ── */}
+      <View
         pointerEvents="none"
+        style={{
+          position: "absolute",
+          width: ARROW_W,
+          height: ARROW_H,
+          top: arrowImageStyle.top,
+          left: arrowImageStyle.left,
+        }}
       >
-        {/* Arrow curve */}
-        <Path
-          d={path}
-          stroke="rgba(255,255,255,0.9)"
-          strokeWidth={2.5}
-          fill="none"
-          strokeDasharray="0"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+        <Image
+          source={ARROW_IMG}
+          style={{
+            width: ARROW_W,
+            height: ARROW_H,
+            opacity: 0.9,
+            transform: [
+              { rotate: arrowImageStyle.rotation },
+              { scaleX: arrowImageStyle.scaleX },
+            ],
+          }}
+          resizeMode="contain"
         />
-        {/* Arrowhead */}
-        <Path
-          d={head}
-          fill="rgba(255,255,255,0.9)"
-          stroke="rgba(255,255,255,0.9)"
-          strokeWidth={1}
-        />
-        {/* Small dot at arrow origin */}
-        <Circle
-          cx={
-            step.arrowSide === "left"
-              ? W / 2 - CARD_W / 2 - 6
-              : step.arrowSide === "right"
-              ? W / 2 + CARD_W / 2 + 6
-              : W / 2 + (step.arrowTipX * W - W / 2) * 0.3
-          }
-          cy={
-            step.arrowSide === "top"
-              ? clampedCardTop - 6
-              : step.arrowSide === "bottom"
-              ? clampedCardTop + CARD_H + 6
-              : clampedCardTop + CARD_H / 2 + (step.arrowTipY * H - clampedCardTop - CARD_H / 2) * 0.3
-          }
-          r={3}
-          fill="rgba(255,255,255,0.7)"
-        />
-      </Svg>
+      </View>
 
       {/* ── Tooltip card ── */}
       <Animated.View

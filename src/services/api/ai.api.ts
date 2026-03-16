@@ -35,10 +35,14 @@ export interface Preset {
 export interface DailyTip {
   tip: string;
   category: string;
+  alert?: string;
 }
 
 export const aiApi = {
   getDailyTip: () => api.get<DailyTip>("/ai/daily-tip"),
+
+  getCameraTip: (imageBase64: string, mimeType = "image/jpeg") =>
+    api.post<DailyTip>("/ai/camera-tip", { imageBase64, mimeType }),
 
   analyzePhoto: (photoId: string, imageUrl: string) =>
     api.post<PhotoAnalysis>("/ai/analyze", { photoId, imageUrl }),

@@ -1,9 +1,12 @@
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 
-const API_BASE =
+const _rawApiUrl =
   process.env.EXPO_PUBLIC_API_URL ||
-  (__DEV__ ? "http://localhost:3000/api" : "https://api.kaytipic.com/api");
+  (__DEV__ ? "http://localhost:3000" : "https://api.kaytipic.com");
+
+// Ensure the base URL always ends with /api regardless of how the env var is set
+const API_BASE = _rawApiUrl.replace(/\/api\/?$/, "") + "/api";
 
 // ── snake_case → camelCase transform for Prisma responses ──
 function snakeToCamel(str: string): string {

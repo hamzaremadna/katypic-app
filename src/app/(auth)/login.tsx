@@ -183,8 +183,8 @@ export default function LoginScreen() {
               </TouchableOpacity>
             )}
 
-            {/* Apple (iOS only) */}
-            {Platform.OS === "ios" && (
+            {/* Apple (iOS only) — disabled in beta builds (ASC API Key can't configure capability identifier) */}
+            {Platform.OS === "ios" && process.env.EXPO_PUBLIC_DISABLE_APPLE_AUTH !== "true" && (
               <TouchableOpacity style={s.socialCardBtn} activeOpacity={0.85} onPress={handleAppleLogin} disabled={isLoading}>
                 <Icon name="apple" size={20} color="#fff" />
                 <Text style={s.socialBtnText}>Continuer avec Apple</Text>

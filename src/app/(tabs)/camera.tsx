@@ -19,6 +19,11 @@ import { Icon } from "../../components/ui/Icon";
 import { TourOverlay } from "../../components/tour/TourOverlay";
 import { TOUR_CAMERA } from "../../data/tours";
 import { useTourStore } from "../../stores/tourStore";
+import { AssistantModeModal } from "../../components/camera/AssistantModeModal";
+import { AiTipOverlay } from "../../components/camera/AiTipOverlay";
+import type { AssistantMode } from "../../components/camera/AssistantModeModal";
+import { aiApi } from "../../services/api/ai.api";
+import { readAsStringAsync, deleteAsync } from "expo-file-system/legacy";
 
 const { width, height } = Dimensions.get("window");
 
@@ -221,6 +226,86 @@ export default function CameraScreen() {
     });
   }, []);
 
+  // ── AI Assistant ───────────────────────────────────────
+  const [showModeModal, setShowModeModal] = useState(false);
+  const [assistantActive, setAssistantActive] = useState(false);
+  const [assistantMode, setAssistantMode] = useState<AssistantMode>("text");
+  const [assistantIntensity, setAssistantIntensity] = useState(60);
+  const [currentTip, setCurrentTip] = useState<{ tip: string; category: string; alert?: string } | null>(null);
+  const [showTipOverlay, setShowTipOverlay] = useState(false);
+  const tipIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  /** intensity 20–100 → poll interval 30s–8s */
+  const intensityToMs = (intensity: number) =>
+    Math.round(30000 - ((intensity - 20) / 80) * 22000);
+
+  const FALLBACK_TIPS = [
+    { alert: "Sous-exposition", tip: "La scène est trop sombre — cherchez plus de lumière ou activez le flash.", category: "lumiere" },
+    { alert: "Horizon penché", tip: "Inclinez légèrement votre téléphone pour redresser l'horizon.", category: "technique" },
+    { alert: "Sujet trop loin", tip: "Faites deux pas vers votre sujet pour remplir davantage le cadre.", category: "composition" },
+    { alert: "Contre-jour", tip: "Repositionnez-vous pour avoir la source de lumière dans le dos.", category: "lumiere" },
+    { alert: "Cadrage déséquilibré", tip: "Déplacez votre sujet vers une intersection des lignes du tiers.", category: "composition" },
+  ];
+
+  const fetchTip = useCallback(async () => {
+    if (!cameraRef.current) return;
+    try {
+      // Silently capture a low-quality JPEG frame (skipProcessing: false ensures JPEG, not HEIC)
+      const frame = await cameraRef.current.takePictureAsync({
+        quality: 0.2,
+        skipProcessing: false,
+      });
+      if (!frame?.uri) return;
+
+      // Read as base64 using the legacy API (available in the current native build)
+      const base64 = await readAsStringAsync(frame.uri, { encoding: "base64" });
+
+      // Fire-and-forget cleanup
+      deleteAsync(frame.uri, { idempotent: true }).catch(() => {});
+
+      const response = await aiApi.getCameraTip(base64, "image/jpeg");
+      setCurrentTip(response.data);
+      setShowTipOverlay(true);
+    } catch {
+      // API down or capture failed — show a local fallback tip so user always gets something
+      const fallback = FALLBACK_TIPS[Math.floor(Math.random() * FALLBACK_TIPS.length)];
+      setCurrentTip(fallback);
+      setShowTipOverlay(true);
+    }
+  }, []);
+
+  const startAssistant = useCallback(
+    (mode: AssistantMode, intensity: number) => {
+      setAssistantMode(mode);
+      setAssistantIntensity(intensity);
+      setAssistantActive(true);
+      setShowModeModal(false);
+
+      // Fetch first tip immediately, then poll
+      fetchTip();
+      const ms = intensityToMs(intensity);
+      tipIntervalRef.current = setInterval(fetchTip, ms);
+    },
+    [fetchTip],
+  );
+
+  const stopAssistant = useCallback(() => {
+    if (tipIntervalRef.current) {
+      clearInterval(tipIntervalRef.current);
+      tipIntervalRef.current = null;
+    }
+    setAssistantActive(false);
+    setShowTipOverlay(false);
+    setCurrentTip(null);
+  }, []);
+
+  // Clean up interval on unmount
+  useEffect(() => {
+    return () => {
+      if (tipIntervalRef.current) clearInterval(tipIntervalRef.current);
+    };
+  }, []);
+
   // Capture button animation
   const captureScale = useRef(new Animated.Value(1)).current;
   const captureOpacity = useRef(new Animated.Value(1)).current;
@@ -333,16 +418,20 @@ export default function CameraScreen() {
           <TouchableOpacity
             activeOpacity={0.85}
             style={s.assistantBtnWrapper}
-            onPress={() => router.push("/analyse/import")}
+            onPress={() => assistantActive ? stopAssistant() : setShowModeModal(true)}
           >
             <LinearGradient
-              colors={[Colors.gradientPink, Colors.gradientPurple]}
+              colors={assistantActive
+                ? ["rgba(233,30,140,0.4)", "rgba(123,47,190,0.4)"]
+                : [Colors.gradientPink, Colors.gradientPurple]}
               style={s.assistantBtn}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
             >
               <Icon name="sparkles" size={14} color="#FFFFFF" />
-              <Text style={s.assistantText}>Assistant magique</Text>
+              <Text style={s.assistantText}>
+                {assistantActive ? "Désactiver" : "Assistant magique"}
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -474,6 +563,17 @@ export default function CameraScreen() {
             </TouchableOpacity>
           </View>
         </View>
+        {/* AI Tip Overlay — inside CameraView so it floats over the viewfinder */}
+        {showTipOverlay && currentTip && (
+          <AiTipOverlay
+            tip={currentTip.tip}
+            alert={currentTip.alert}
+            category={currentTip.category}
+            mode={assistantMode}
+            onClose={() => setShowTipOverlay(false)}
+            onListen={() => {/* TTS deferred — requires expo-speech rebuild */}}
+          />
+        )}
       </CameraView>
 
       {/* <BottomTabBar activeRoute="/(tabs)/camera" /> */}
@@ -487,6 +587,13 @@ export default function CameraScreen() {
           setShowTour(false);
           markSeen("camera");
         }}
+      />
+
+      {/* ── Assistant Mode Modal ── */}
+      <AssistantModeModal
+        visible={showModeModal}
+        onClose={() => setShowModeModal(false)}
+        onConfirm={startAssistant}
       />
     </View>
   );

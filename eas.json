@@ -16,7 +16,20 @@
     "preview": {
       "distribution": "internal",
       "ios": { "simulator": false },
-      "channel": "preview"
+      "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://katypic-api-production.up.railway.app"
+      }
+    },
+    "beta": {
+      "distribution": "store",
+      "channel": "preview",
+      "ios": { "resourceClass": "m-medium" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://katypic-api-production.up.railway.app",
+        "EXPO_PUBLIC_DISABLE_APPLE_AUTH": "true",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+      }
     },
     "production": {
       "autoIncrement": true,
@@ -27,9 +40,11 @@
   "submit": {
     "production": {
       "ios": {
-        "appleId": "YOUR_APPLE_ID",
-        "ascAppId": "YOUR_APP_STORE_CONNECT_APP_ID",
-        "appleTeamId": "YOUR_APPLE_TEAM_ID"
+        "appleTeamId": "M9552LZ63U",
+        "ascAppId": "6760631395",
+        "ascApiKeyPath": "./AuthKey_79LM9M49D7.p8",
+        "ascApiKeyIssuerId": "01b2d9bc-e678-4f25-95a2-9bfeb304b686",
+        "ascApiKeyId": "79LM9M49D7"
       },
       "android": {
         "serviceAccountKeyPath": "./google-services.json",
