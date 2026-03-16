@@ -5,19 +5,18 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { Colors, Gradients } from "../../theme/colors";
+import { Colors } from "../../theme/colors";
 import { Fonts } from "../../theme/typography";
-import { KaytiHeader, BottomTabBar } from "../../components/ui";
+import { KaytiHeader } from "../../components/ui";
 import { Icon, IconName } from "../../components/ui/Icon";
+import { useQuestPath, useStartQuest } from "../../hooks/useQuestPaths";
 
-const { width } = Dimensions.get("window");
-
-// ─── Types ───────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────
 type QuestStatus = "completed" | "in_progress" | "locked";
 
 interface Quest {
@@ -27,228 +26,30 @@ interface Quest {
   subtitle: string;
   xp: number;
   status: QuestStatus;
-  progress?: string;
-  progressPercent?: number;
+  requiredPhotos: number;
+  photosTaken: number;
   icon: IconName;
-  isFinal?: boolean;
+  isFinal: boolean;
+  tips: string[];
 }
 
-interface PathConfig {
-  title: string;
-  headerColor: string;
-  accentColor: string;
-  bgGradient: readonly [string, string];
-  completedCount: number;
-  totalCount: number;
-  quests: Quest[];
-}
-
-// ─── Data by path ────────────────────────────────────────
-const PATH_DATA: Record<string, PathConfig> = {
-  debutant: {
-    title: "Quêtes Débutant",
-    headerColor: "#4A90E2",
-    accentColor: "#4A90E2",
-    bgGradient: ["rgba(74,144,226,0.15)", "transparent"],
-    completedCount: 2,
-    totalCount: 6,
-    quests: [
-      {
-        id: "d1",
-        category: "DÉCOUVERTE",
-        title: "Premiers pas",
-        subtitle: "Découvre l'application",
-        xp: 10,
-        status: "completed",
-        icon: "compass",
-      },
-      {
-        id: "d2",
-        category: "INTERFACE",
-        title: "L'interface",
-        subtitle: "Maîtrise les outils",
-        xp: 15,
-        status: "completed",
-        icon: "sliders",
-      },
-      {
-        id: "d3",
-        category: "PHOTO",
-        title: "Prise de photo",
-        subtitle: "Capture 5 photos",
-        xp: 20,
-        status: "in_progress",
-        progress: "3/5",
-        progressPercent: 60,
-        icon: "camera",
-      },
-      {
-        id: "d4",
-        category: "RETOUCHE",
-        title: "Retouche basique",
-        subtitle: "Retouche ta première photo",
-        xp: 25,
-        status: "locked",
-        icon: "image",
-      },
-      {
-        id: "d5",
-        category: "IA",
-        title: "Assistant IA",
-        subtitle: "Utilise l'analyse IA",
-        xp: 30,
-        status: "locked",
-        icon: "sparkles",
-      },
-      {
-        id: "d-final",
-        category: "MISSION FINALE",
-        title: "Maîtrise app",
-        subtitle: "Termine toutes les étapes",
-        xp: 50,
-        status: "locked",
-        icon: "trophy",
-        isFinal: true,
-      },
-    ],
-  },
-  creatif: {
-    title: "Quêtes Créatif",
-    headerColor: "#9B59B6",
-    accentColor: "#9B59B6",
-    bgGradient: ["rgba(155,89,182,0.2)", "transparent"],
-    completedCount: 1,
-    totalCount: 6,
-    quests: [
-      {
-        id: "c1",
-        category: "COMPOSITION",
-        title: "Règle des Tiers",
-        subtitle: "Divise ton image",
-        xp: 25,
-        status: "completed",
-        icon: "grid",
-      },
-      {
-        id: "c2",
-        category: "LUMIÈRE",
-        title: "Jeu Lumière",
-        subtitle: "Maîtrise l'éclairage",
-        xp: 30,
-        status: "in_progress",
-        progress: "2/5",
-        progressPercent: 40,
-        icon: "sun",
-      },
-      {
-        id: "c3",
-        category: "TIMING",
-        title: "Golden Hour",
-        subtitle: "Heure dorée",
-        xp: 35,
-        status: "locked",
-        icon: "clock",
-      },
-      {
-        id: "c4",
-        category: "PORTRAIT",
-        title: "Portrait Créatif",
-        subtitle: "3 angles différents",
-        xp: 40,
-        status: "locked",
-        icon: "user",
-      },
-      {
-        id: "c5",
-        category: "COULEUR",
-        title: "Couleurs Vibrantes",
-        subtitle: "Série colorée",
-        xp: 40,
-        status: "locked",
-        icon: "sparkles",
-      },
-      {
-        id: "c-final",
-        category: "FINALE",
-        title: "Artiste Accompli",
-        subtitle: "Complète toutes les quêtes",
-        xp: 100,
-        status: "locked",
-        icon: "trophy",
-        isFinal: true,
-      },
-    ],
-  },
-  explorateur: {
-    title: "Quêtes Explorateur",
-    headerColor: "#E91E8C",
-    accentColor: "#E91E8C",
-    bgGradient: ["rgba(233,30,140,0.15)", "transparent"],
-    completedCount: 1,
-    totalCount: 6,
-    quests: [
-      {
-        id: "e1",
-        category: "DÉCOUVERTE",
-        title: "Premier Spot",
-        subtitle: "Visite un spot photo",
-        xp: 15,
-        status: "completed",
-        icon: "marker-pin",
-      },
-      {
-        id: "e2",
-        category: "ÉVÉNEMENT",
-        title: "Premier Event",
-        subtitle: "Participe à un événement",
-        xp: 25,
-        status: "in_progress",
-        progress: "0/1",
-        progressPercent: 0,
-        icon: "calendar",
-      },
-      {
-        id: "e3",
-        category: "COMMUNAUTÉ",
-        title: "Photographe Social",
-        subtitle: "Ajoute 3 amis",
-        xp: 20,
-        status: "locked",
-        icon: "users",
-      },
-      {
-        id: "e4",
-        category: "PARTAGE",
-        title: "Partage & Inspire",
-        subtitle: "Partage 5 photos",
-        xp: 30,
-        status: "locked",
-        icon: "share",
-      },
-      {
-        id: "e5",
-        category: "VOYAGE",
-        title: "Globe-trotter",
-        subtitle: "Visite 5 spots différents",
-        xp: 40,
-        status: "locked",
-        icon: "globe",
-      },
-      {
-        id: "e-final",
-        category: "MISSION FINALE",
-        title: "Grand Explorateur",
-        subtitle: "Termine toutes les étapes",
-        xp: 75,
-        status: "locked",
-        icon: "trophy",
-        isFinal: true,
-      },
-    ],
-  },
+// ─── Helpers ──────────────────────────────────────────────
+const CATEGORY_ICON: Record<string, IconName> = {
+  PHOTO:       "camera",
+  "LUMIÈRE":   "sun",
+  COMPOSITION: "grid",
+  TECHNIQUE:   "sliders",
+  "DÉCOUVERTE": "compass",
+  "ÉVÉNEMENT": "calendar",
 };
 
-// ─── Quest Card ──────────────────────────────────────────
+function mapStatus(status: string): QuestStatus {
+  if (status === "COMPLETED")   return "completed";
+  if (status === "IN_PROGRESS") return "in_progress";
+  return "locked";
+}
+
+// ─── Quest Card ───────────────────────────────────────────
 function QuestCard({
   quest,
   accentColor,
@@ -258,9 +59,15 @@ function QuestCard({
   accentColor: string;
   onPress: () => void;
 }) {
-  const isCompleted = quest.status === "completed";
+  const isCompleted  = quest.status === "completed";
   const isInProgress = quest.status === "in_progress";
-  const isLocked = quest.status === "locked";
+  const isLocked     = quest.status === "locked";
+
+  const progressPercent =
+    quest.requiredPhotos > 0
+      ? Math.round((quest.photosTaken / quest.requiredPhotos) * 100)
+      : 0;
+  const progressText = `${quest.photosTaken}/${quest.requiredPhotos}`;
 
   return (
     <TouchableOpacity
@@ -270,8 +77,8 @@ function QuestCard({
         isLocked && qc.cardLocked,
         quest.isFinal && { borderColor: "#FFB800", borderWidth: 1.5 },
       ]}
-      activeOpacity={isLocked ? 1 : 0.85}
-      disabled={isLocked}
+      activeOpacity={isLocked || isCompleted ? 1 : 0.85}
+      disabled={isLocked || isCompleted}
       onPress={onPress}
     >
       {/* Completed overlay */}
@@ -282,7 +89,7 @@ function QuestCard({
         />
       )}
 
-      {/* In progress background */}
+      {/* In-progress background */}
       {isInProgress && (
         <LinearGradient
           colors={[`${accentColor}15`, "rgba(26,26,46,0.95)"]}
@@ -303,7 +110,7 @@ function QuestCard({
       )}
 
       <View style={qc.content}>
-        {/* Left side: icon or checkmark */}
+        {/* Left: icon or status indicator */}
         <View style={qc.leftSide}>
           {isCompleted ? (
             <View style={[qc.checkCircle, { backgroundColor: `${accentColor}30` }]}>
@@ -314,13 +121,18 @@ function QuestCard({
               <Icon name="lock" size={18} color={Colors.textMuted} />
             </View>
           ) : (
-            <View style={[qc.iconCircle, { backgroundColor: `${accentColor}20`, borderColor: `${accentColor}40` }]}>
+            <View
+              style={[
+                qc.iconCircle,
+                { backgroundColor: `${accentColor}20`, borderColor: `${accentColor}40` },
+              ]}
+            >
               <Icon name={quest.icon} size={20} color={accentColor} />
             </View>
           )}
         </View>
 
-        {/* Center: title + subtitle */}
+        {/* Center: title + subtitle + XP */}
         <View style={qc.center}>
           {quest.isFinal && (
             <View style={qc.finalTag}>
@@ -340,8 +152,6 @@ function QuestCard({
           <Text style={[qc.subtitle, isLocked && qc.subtitleLocked]}>
             {quest.subtitle}
           </Text>
-
-          {/* XP */}
           <View style={qc.xpRow}>
             {isCompleted ? (
               <>
@@ -353,53 +163,40 @@ function QuestCard({
             ) : (
               <>
                 <Icon name="zap" size={12} color="#FF8C00" />
-                <Text style={[qc.xpText, { color: "#FF8C00" }]}>
-                  {quest.xp} XP
-                </Text>
+                <Text style={[qc.xpText, { color: "#FF8C00" }]}>{quest.xp} XP</Text>
               </>
             )}
           </View>
         </View>
 
-        {/* Right side: status badge or EN COURS + progress */}
+        {/* Right: badge + progress */}
         <View style={qc.rightSide}>
           {isInProgress && (
             <>
               <View style={[qc.enCoursBadge, { backgroundColor: accentColor }]}>
                 <Text style={qc.enCoursText}>EN COURS</Text>
               </View>
-              <Text style={[qc.progressText, { color: accentColor }]}>
-                {quest.progress}
-              </Text>
+              <Text style={[qc.progressText, { color: accentColor }]}>{progressText}</Text>
+              <Text style={[qc.percentText, { color: accentColor }]}>{progressPercent}%</Text>
+              <Icon name="chevron-right" size={18} color={Colors.textMuted} />
             </>
-          )}
-          {isInProgress && quest.progressPercent != null && (
-            <Text style={[qc.percentText, { color: accentColor }]}>
-              {quest.progressPercent}%
-            </Text>
           )}
           {quest.isFinal && isLocked && (
             <View style={qc.finalLock}>
               <Icon name="lock" size={16} color={Colors.textMuted} />
             </View>
           )}
-          {isInProgress && (
-            <Icon name="chevron-right" size={18} color={Colors.textMuted} />
-          )}
         </View>
       </View>
 
       {/* Progress bar for in-progress quests */}
-      {isInProgress && quest.progressPercent != null && (
+      {isInProgress && (
         <View style={qc.progressBarWrap}>
           <View style={qc.progressBarTrack}>
             <View
               style={[
                 qc.progressBarFill,
-                {
-                  width: `${quest.progressPercent}%`,
-                  backgroundColor: accentColor,
-                },
+                { width: `${progressPercent}%`, backgroundColor: accentColor },
               ]}
             />
           </View>
@@ -485,13 +282,44 @@ const qc = StyleSheet.create({
   progressBarFill: { height: "100%", borderRadius: 3 },
 });
 
-// ─── Main Screen ─────────────────────────────────────────
+// ─── Main Screen ──────────────────────────────────────────
 export default function QuestPathScreen() {
   const router = useRouter();
   const { pathId } = useLocalSearchParams<{ pathId: string }>();
+  const { data, isLoading } = useQuestPath(pathId ?? "");
+  const { mutate: doStartQuest } = useStartQuest();
 
-  const config = PATH_DATA[pathId ?? "debutant"] ?? PATH_DATA.debutant;
-  const progress = config.completedCount / config.totalCount;
+  if (isLoading || !data) {
+    return (
+      <View style={[s.container, s.centered]}>
+        <StatusBar style="light" />
+        <LinearGradient
+          colors={["#0E0A24", "#080814"]}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <ActivityIndicator color="#4A90E2" size="large" />
+      </View>
+    );
+  }
+
+  const { path, quests: apiQuests } = data;
+  const accentColor = path.color;
+  const bgGradient = [`${accentColor}20`, "transparent"] as readonly [string, string];
+  const progress = path.totalCount > 0 ? path.completedCount / path.totalCount : 0;
+
+  const quests: Quest[] = apiQuests.map((q) => ({
+    id: q.id,
+    category: q.category,
+    title: q.title,
+    subtitle: q.subtitle,
+    xp: q.xp,
+    status: mapStatus(q.status),
+    requiredPhotos: q.requiredPhotos,
+    photosTaken: q.photosTaken,
+    icon: (CATEGORY_ICON[q.category] ?? "camera") as IconName,
+    isFinal: q.isFinal,
+    tips: q.tips,
+  }));
 
   return (
     <View style={s.container}>
@@ -501,9 +329,9 @@ export default function QuestPathScreen() {
         style={StyleSheet.absoluteFillObject}
       />
 
-      {/* Header gradient */}
+      {/* Header gradient glow */}
       <LinearGradient
-        colors={config.bgGradient as [string, string]}
+        colors={bgGradient as [string, string]}
         style={s.headerGlow}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
@@ -515,23 +343,21 @@ export default function QuestPathScreen() {
       >
         <KaytiHeader
           showBack
-          title={config.title}
-          rightIcon={
-            <Icon name="star" size={20} color={config.accentColor} />
-          }
+          title={`Quêtes ${path.title}`}
+          rightIcon={<Icon name="star" size={20} color={accentColor} />}
         />
 
-        {/* Level progress */}
+        {/* Level progress card */}
         <View style={s.levelCard}>
           <View style={s.levelRow}>
             <Text style={s.levelText}>
-              Niveau {config.completedCount + 1} sur {config.totalCount}
+              Niveau {path.completedCount + 1} sur {path.totalCount}
             </Text>
             <View style={s.levelCount}>
               <Text style={s.levelCountText}>
-                {config.completedCount}/{config.totalCount}
+                {path.completedCount}/{path.totalCount}
               </Text>
-              {config.completedCount > 0 && (
+              {path.completedCount > 0 && (
                 <Icon name="check" size={12} color={Colors.accentGreen} />
               )}
             </View>
@@ -540,10 +366,7 @@ export default function QuestPathScreen() {
             <View
               style={[
                 s.levelBarFill,
-                {
-                  width: `${progress * 100}%`,
-                  backgroundColor: config.accentColor,
-                },
+                { width: `${progress * 100}%`, backgroundColor: accentColor },
               ]}
             />
           </View>
@@ -551,13 +374,15 @@ export default function QuestPathScreen() {
 
         {/* Quest list */}
         <View style={s.questList}>
-          {config.quests.map((quest) => (
+          {quests.map((quest) => (
             <QuestCard
               key={quest.id}
               quest={quest}
-              accentColor={config.accentColor}
+              accentColor={accentColor}
               onPress={() => {
                 if (quest.status === "in_progress") {
+                  // Fire-and-forget: sets started_at if not already set
+                  doStartQuest(quest.id);
                   router.push({
                     pathname: "/quest/challenge/[challengeId]",
                     params: {
@@ -565,10 +390,12 @@ export default function QuestPathScreen() {
                       title: quest.title,
                       category: quest.category,
                       subtitle: quest.subtitle,
-                      progress: quest.progress ?? "",
                       xp: String(quest.xp),
-                      color: config.accentColor,
+                      color: accentColor,
                       icon: quest.icon,
+                      requiredPhotos: String(quest.requiredPhotos),
+                      photosTaken: String(quest.photosTaken),
+                      tips: JSON.stringify(quest.tips),
                     },
                   });
                 }
@@ -579,15 +406,14 @@ export default function QuestPathScreen() {
 
         <View style={{ height: 110 }} />
       </ScrollView>
-
-      <BottomTabBar activeRoute="/(tabs)/quests" />
     </View>
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────
+// ─── Styles ───────────────────────────────────────────────
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bgDeep },
+  centered: { justifyContent: "center", alignItems: "center" },
   scroll: { paddingBottom: 20 },
   headerGlow: {
     position: "absolute",

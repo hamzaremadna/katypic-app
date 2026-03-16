@@ -6,19 +6,21 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import Svg, { Circle } from "react-native-svg";
-import { Colors, Gradients } from "../../theme/colors";
+import { Colors } from "../../theme/colors";
 import { Fonts } from "../../theme/typography";
 import { KaytiHeader, BottomTabBar } from "../../components/ui";
 import { Icon, IconName } from "../../components/ui/Icon";
+import { useQuestPaths, useQuestStats } from "../../hooks/useQuestPaths";
 
 const { width } = Dimensions.get("window");
 
-// ─── Types & Data ────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────
 interface StatRing {
   label: string;
   value: string;
@@ -48,66 +50,30 @@ interface Badge {
   unlocked: boolean;
 }
 
-const STATS: StatRing[] = [
-  { label: "JOURS", value: "5", color: "#E91E8C", progress: 0.7, icon: "clock" },
-  { label: "NIVEAU", value: "3", color: "#4A90E2", progress: 0.5, icon: "zap" },
-  { label: "BADGES", value: "3/6", color: "#FFB800", progress: 0.5, icon: "trophy" },
+// ─── Static mappings ──────────────────────────────────────
+const PATH_SUBTITLES: Record<string, string> = {
+  debutant:    "Apprends les fondamentaux de la photo",
+  creatif:     "Développe ton style unique et ta vision",
+  explorateur: "Découvre les meilleurs spots urbains",
+};
+
+const BADGE_ICON_MAP: Record<string, IconName> = {
+  sun:      "sun",
+  grid:     "grid",
+  sunset:   "sun",
+  user:     "user",
+  building: "target",
+  camera:   "camera",
+  moon:     "moon",
+  map:      "map",
+};
+
+const BADGE_COLORS = [
+  "#4A90E2", "#E91E8C", "#00C851", "#9B59B6",
+  "#4A90E2", "#FFB800", "#E91E8C", "#9B59B6",
 ];
 
-const PATHS: QuestPath[] = [
-  {
-    id: "debutant",
-    tag: "LES BASES",
-    tagColor: "#4A90E2",
-    borderColor: "#4A90E2",
-    bgColors: ["rgba(74,144,226,0.15)", "rgba(26,26,46,0.95)"],
-    title: "Débutant",
-    subtitle: "Apprends les fondamentaux de la photo",
-    completedCount: 2,
-    totalCount: 6,
-    icon: "target",
-    iconColor: "#4A90E2",
-  },
-  {
-    id: "creatif",
-    tag: "MODE ARTISTIQUE",
-    tagColor: "#9B59B6",
-    borderColor: "#9B59B6",
-    bgColors: ["rgba(155,89,182,0.15)", "rgba(26,26,46,0.95)"],
-    title: "Créatif",
-    subtitle: "Développe ton style unique et ta vision",
-    completedCount: 1,
-    totalCount: 6,
-    icon: "sparkles",
-    iconColor: "#9B59B6",
-  },
-  {
-    id: "explorateur",
-    tag: "MONDE OUVERT",
-    tagColor: "#E91E8C",
-    borderColor: "#E91E8C",
-    bgColors: ["rgba(233,30,140,0.15)", "rgba(26,26,46,0.95)"],
-    title: "Explorateur",
-    subtitle: "Découvre les meilleurs spots urbains",
-    completedCount: 1,
-    totalCount: 6,
-    icon: "map",
-    iconColor: "#E91E8C",
-  },
-];
-
-const BADGES: Badge[] = [
-  { id: "1", icon: "camera", color: "#4A90E2", unlocked: true },
-  { id: "2", icon: "sun", color: "#E91E8C", unlocked: true },
-  { id: "3", icon: "target", color: "#00C851", unlocked: true },
-  { id: "4", icon: "sparkles", color: "#9B59B6", unlocked: false },
-  { id: "5", icon: "map", color: "#4A90E2", unlocked: false },
-  { id: "6", icon: "trophy", color: "#FFB800", unlocked: false },
-  { id: "7", icon: "zap", color: "#E91E8C", unlocked: false },
-  { id: "8", icon: "star", color: "#9B59B6", unlocked: false },
-];
-
-// ─── Stat Ring Component ─────────────────────────────────
+// ─── Stat Ring Component ──────────────────────────────────
 const RING_SIZE = 80;
 const RING_STROKE = 5;
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
@@ -115,7 +81,7 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
 function StatRingItem({ stat }: { stat: StatRing }) {
   const strokeDashoffset =
-    RING_CIRCUMFERENCE - stat.progress * RING_CIRCUMFERENCE;
+    RING_CIRCUMFERENCE - Math.min(stat.progress, 1) * RING_CIRCUMFERENCE;
 
   return (
     <View style={srStyles.item}>
@@ -170,9 +136,9 @@ const srStyles = StyleSheet.create({
   },
 });
 
-// ─── Path Card Component ─────────────────────────────────
+// ─── Path Card Component ──────────────────────────────────
 function PathCard({ path, onPress }: { path: QuestPath; onPress: () => void }) {
-  const progress = path.completedCount / path.totalCount;
+  const progress = path.totalCount > 0 ? path.completedCount / path.totalCount : 0;
   const percentage = Math.round(progress * 100);
 
   return (
@@ -282,7 +248,7 @@ const pcStyles = StyleSheet.create({
   barFill: { height: "100%", borderRadius: 3 },
 });
 
-// ─── Badge Item ──────────────────────────────────────────
+// ─── Badge Item ───────────────────────────────────────────
 function BadgeItem({ badge }: { badge: Badge }) {
   return (
     <View style={!badge.unlocked ? biStyles.locked : undefined}>
@@ -315,14 +281,85 @@ const biStyles = StyleSheet.create({
   },
 });
 
-// ─── Main Screen ─────────────────────────────────────────
+// ─── Main Screen ──────────────────────────────────────────
 export default function QuestsScreen() {
   const router = useRouter();
+  const { data: pathsData, isLoading: pathsLoading } = useQuestPaths();
+  const { data: stats, isLoading: statsLoading } = useQuestStats();
 
-  const totalXp = 340;
-  const nextLevelXp = 500;
-  const currentLevel = 3;
-  const xpProgress = totalXp / nextLevelXp;
+  const isLoading = pathsLoading || statsLoading;
+
+  // Derived values
+  const unlockedCount = stats?.badges.filter((b) => b.unlocked).length ?? 0;
+  const totalBadges = stats?.badges.length ?? 8;
+
+  const statsRings: StatRing[] = [
+    {
+      label: "JOURS",
+      value: String(stats?.daysActive ?? 0),
+      color: "#E91E8C",
+      progress: Math.min((stats?.daysActive ?? 0) / 30, 1),
+      icon: "clock",
+    },
+    {
+      label: "NIVEAU",
+      value: String(stats?.level ?? 1),
+      color: "#4A90E2",
+      progress:
+        stats && stats.xpToNextLevel > 0
+          ? (stats.xp - stats.xpForCurrentLevel) / stats.xpToNextLevel
+          : 0,
+      icon: "zap",
+    },
+    {
+      label: "BADGES",
+      value: `${unlockedCount}/${totalBadges}`,
+      color: "#FFB800",
+      progress: totalBadges > 0 ? unlockedCount / totalBadges : 0,
+      icon: "trophy",
+    },
+  ];
+
+  const currentLevel = stats?.level ?? 1;
+  const totalXp = stats?.xp ?? 0;
+  const xpForCurrent = stats?.xpForCurrentLevel ?? 0;
+  const xpToNext = stats?.xpToNextLevel ?? 100;
+  const nextLevelThreshold = xpForCurrent + xpToNext;
+  const xpProgress = xpToNext > 0 ? (totalXp - xpForCurrent) / xpToNext : 0;
+
+  const paths: QuestPath[] = (pathsData ?? []).map((p) => ({
+    id: p.slug,
+    tag: p.tag,
+    tagColor: p.color,
+    borderColor: p.color,
+    bgColors: [`${p.color}26`, "rgba(26,26,46,0.95)"] as readonly [string, string],
+    title: p.title,
+    subtitle: PATH_SUBTITLES[p.slug] ?? "",
+    completedCount: p.completedCount,
+    totalCount: p.totalCount,
+    icon: p.icon as IconName,
+    iconColor: p.color,
+  }));
+
+  const badges: Badge[] = (stats?.badges ?? []).map((b, i) => ({
+    id: b.id,
+    icon: (BADGE_ICON_MAP[b.icon] ?? "star") as IconName,
+    color: BADGE_COLORS[i % BADGE_COLORS.length],
+    unlocked: b.unlocked,
+  }));
+
+  if (isLoading) {
+    return (
+      <View style={[s.container, s.centered]}>
+        <StatusBar style="light" />
+        <LinearGradient
+          colors={["#0E0A24", "#080814"]}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <ActivityIndicator color="#4A90E2" size="large" />
+      </View>
+    );
+  }
 
   return (
     <View style={s.container}>
@@ -340,7 +377,7 @@ export default function QuestsScreen() {
 
         {/* Stat Rings */}
         <View style={s.statsRow}>
-          {STATS.map((stat) => (
+          {statsRings.map((stat) => (
             <StatRingItem key={stat.label} stat={stat} />
           ))}
         </View>
@@ -355,13 +392,13 @@ export default function QuestsScreen() {
               Niveau {currentLevel} → {currentLevel + 1}
             </Text>
             <Text style={s.xpCount}>
-              {totalXp} / {nextLevelXp}
+              {totalXp} / {nextLevelThreshold}
             </Text>
           </View>
           <View style={s.xpBarTrack}>
             <LinearGradient
               colors={["#4A90E2", "#7B2FBE"]}
-              style={[s.xpBarFill, { width: `${xpProgress * 100}%` }]}
+              style={[s.xpBarFill, { width: `${Math.min(xpProgress, 1) * 100}%` }]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
             />
@@ -377,7 +414,7 @@ export default function QuestsScreen() {
         </View>
 
         <View style={s.pathsList}>
-          {PATHS.map((path) => (
+          {paths.map((path) => (
             <PathCard
               key={path.id}
               path={path}
@@ -402,7 +439,7 @@ export default function QuestsScreen() {
         </View>
 
         <View style={s.badgesGrid}>
-          {BADGES.map((badge) => (
+          {badges.map((badge) => (
             <BadgeItem key={badge.id} badge={badge} />
           ))}
         </View>
@@ -415,9 +452,10 @@ export default function QuestsScreen() {
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────
+// ─── Styles ───────────────────────────────────────────────
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bgDeep },
+  centered: { justifyContent: "center", alignItems: "center" },
   scroll: { paddingBottom: 20 },
 
   statsRow: {

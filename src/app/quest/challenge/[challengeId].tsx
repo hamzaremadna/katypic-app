@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,32 +11,17 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { navigate } from "@/utils/navigation";
-import { Colors, Gradients } from "../../../theme/colors";
+import { Colors } from "../../../theme/colors";
 import { Fonts } from "../../../theme/typography";
-import { BottomTabBar } from "../../../components/ui";
 import { Icon, IconName } from "../../../components/ui/Icon";
+import { useSyncQuestProgress, useCompleteQuest } from "../../../hooks/useQuestPaths";
 
 const { width } = Dimensions.get("window");
 const PHOTO_SIZE = (width - 52) / 2;
 
-// ─── Tips data per category ──────────────────────────────
-const TIPS: Record<string, string> = {
-  LUMIÈRE:
-    "Jouez avec les ombres, les contre-jours, l'heure dorée ou les néons urbains pour créer des ambiances uniques !",
-  PHOTO:
-    "Variez les angles, essayez la plongée et contre-plongée. Cherchez des lignes directrices dans votre composition.",
-  COMPOSITION:
-    "Placez les éléments clés aux intersections de la grille des tiers. Laissez de l'espace devant le regard du sujet.",
-  ÉVÉNEMENT:
-    "Participez aux événements photo pour rencontrer d'autres passionnés et découvrir de nouveaux spots.",
-  DÉCOUVERTE:
-    "Explorez votre environnement avec un œil neuf. Les meilleurs spots sont parfois les plus inattendus.",
-  default:
-    "Prenez votre temps, expérimentez différentes approches et n'hésitez pas à sortir de votre zone de confort !",
-};
-
-// ─── Main Screen ─────────────────────────────────────────
+// ─── Main Screen ──────────────────────────────────────────
 export default function ChallengeDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -44,51 +29,87 @@ export default function ChallengeDetailScreen() {
     title: string;
     category: string;
     subtitle: string;
-    progress: string;
     xp: string;
     color: string;
     icon: string;
+    requiredPhotos: string;
+    photosTaken: string;
+    tips: string;
   }>();
 
-  const title = params.title ?? "Défi";
-  const category = params.category ?? "PHOTO";
-  const subtitle = params.subtitle ?? "Complète ce défi";
-  const progress = params.progress ?? "0/5";
-  const xp = params.xp ?? "30";
-  const color = params.color ?? "#E91E8C";
-  const iconName = (params.icon ?? "camera") as IconName;
+  const challengeId    = params.challengeId ?? "";
+  const title          = params.title ?? "Défi";
+  const category       = params.category ?? "PHOTO";
+  const subtitle       = params.subtitle ?? "Complète ce défi";
+  const xp             = params.xp ?? "30";
+  const color          = params.color ?? "#E91E8C";
+  const iconName       = (params.icon ?? "camera") as IconName;
+  const requiredPhotos = Number(params.requiredPhotos ?? "1");
 
-  const [current, total] = progress.split("/").map(Number);
-  const percent = total > 0 ? Math.round((current / total) * 100) : 0;
-  const tip = TIPS[category] ?? TIPS.default;
+  // Parse tips array from JSON param
+  let parsedTips: string[] = [];
+  try {
+    parsedTips = JSON.parse(params.tips ?? "[]");
+  } catch {
+    parsedTips = [];
+  }
 
-  // Mock submitted photos
-  const [photos] = useState<string[]>([]);
-  const emptySlots = Math.max(0, total - photos.length);
+  // Local state: initialized from params, refreshed on every focus
+  const [photosTaken, setPhotosTaken] = useState(
+    Number(params.photosTaken ?? "0")
+  );
+
+  const syncMutation     = useSyncQuestProgress();
+  const completeMutation = useCompleteQuest();
+
+  // ── Sync on every screen focus (return from camera) ──────
+  useFocusEffect(
+    useCallback(() => {
+      if (!challengeId) return;
+      syncMutation.mutate(challengeId, {
+        onSuccess: (data) => setPhotosTaken(data.photosTaken),
+      });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [challengeId])
+  );
+
+  const percent      = requiredPhotos > 0 ? Math.round((photosTaken / requiredPhotos) * 100) : 0;
+  const canValidate  = photosTaken >= requiredPhotos && !completeMutation.isPending;
+
+  const tipText =
+    parsedTips.length > 0
+      ? parsedTips.map((t) => `• ${t}`).join("\n")
+      : "Prenez votre temps, expérimentez différentes approches et n'hésitez pas à sortir de votre zone de confort !";
 
   const handleAddPhoto = () => {
     navigate("/(tabs)/camera");
   };
 
   const handleValidate = () => {
-    Alert.alert(
-      "Valider le défi",
-      `Voulez-vous soumettre vos ${current} photos pour ce défi ?`,
-      [
-        { text: "Annuler", style: "cancel" },
-        {
-          text: "Valider",
-          onPress: () => router.back(),
-        },
-      ]
-    );
+    if (!canValidate) return;
+    completeMutation.mutate(challengeId, {
+      onSuccess: (data) => {
+        if (data.alreadyCompleted) {
+          router.back();
+        } else {
+          Alert.alert(
+            "🏆 Défi complété !",
+            `Félicitations ! Vous gagnez +${data.xpEarned} XP`,
+            [{ text: "Super !", onPress: () => router.back() }]
+          );
+        }
+      },
+      onError: () => {
+        Alert.alert("Erreur", "Impossible de valider le défi pour l'instant.");
+      },
+    });
   };
 
   return (
     <View style={s.container}>
       <StatusBar style="light" />
 
-      {/* Background gradient matching accent color */}
+      {/* Background gradient */}
       <LinearGradient
         colors={[`${color}25`, `${color}08`, "#080814"]}
         style={s.bgGradient}
@@ -107,7 +128,7 @@ export default function ChallengeDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Icon + badge */}
+        {/* Hero section */}
         <View style={s.heroSection}>
           <View style={[s.enCoursBadge, { backgroundColor: color }]}>
             <Text style={s.enCoursText}>EN COURS</Text>
@@ -124,13 +145,15 @@ export default function ChallengeDetailScreen() {
         <View style={s.progressCard}>
           <View style={s.progressHeader}>
             <Text style={s.progressLabel}>Progression</Text>
-            <Text style={[s.progressCount, { color }]}>{progress}</Text>
+            <Text style={[s.progressCount, { color }]}>
+              {photosTaken}/{requiredPhotos}
+            </Text>
           </View>
           <View style={s.progressBarTrack}>
             <View
               style={[
                 s.progressBarFill,
-                { width: `${percent}%`, backgroundColor: color },
+                { width: `${Math.min(percent, 100)}%`, backgroundColor: color },
               ]}
             />
           </View>
@@ -146,34 +169,44 @@ export default function ChallengeDetailScreen() {
             <Icon name="message-circle" size={16} color={color} />
             <Text style={[s.tipTitle, { color }]}>Conseils</Text>
           </View>
-          <Text style={s.tipText}>{tip}</Text>
+          <Text style={s.tipText}>{tipText}</Text>
         </View>
 
         {/* Photos section */}
         <View style={s.photosSection}>
           <Text style={s.photosSectionTitle}>Vos photos</Text>
           <View style={s.photosGrid}>
-            {/* Submitted photos */}
-            {photos.map((uri, i) => (
-              <View key={`photo-${i}`} style={[s.photoSlot, { borderColor: `${color}60` }]}>
+            {/* Filled slots (photos already taken) */}
+            {Array.from({ length: photosTaken }).map((_, i) => (
+              <View
+                key={`filled-${i}`}
+                style={[s.photoSlot, { borderColor: `${color}60` }]}
+              >
+                <LinearGradient
+                  colors={[`${color}20`, `${color}08`]}
+                  style={StyleSheet.absoluteFillObject}
+                />
                 <View style={s.photoCheck}>
                   <Icon name="check" size={14} color="#fff" />
                 </View>
+                <Icon name="camera" size={28} color={`${color}60`} />
               </View>
             ))}
 
-            {/* Empty slots */}
-            {Array.from({ length: emptySlots }).map((_, i) => (
-              <TouchableOpacity
-                key={`empty-${i}`}
-                style={[s.photoSlot, s.photoSlotEmpty, { borderColor: `${color}40` }]}
-                activeOpacity={0.7}
-                onPress={handleAddPhoto}
-              >
-                <Icon name="camera" size={28} color={color} />
-                <Text style={[s.addText, { color }]}>Ajouter</Text>
-              </TouchableOpacity>
-            ))}
+            {/* Empty slots (tap to open camera) */}
+            {Array.from({ length: Math.max(0, requiredPhotos - photosTaken) }).map(
+              (_, i) => (
+                <TouchableOpacity
+                  key={`empty-${i}`}
+                  style={[s.photoSlot, s.photoSlotEmpty, { borderColor: `${color}40` }]}
+                  activeOpacity={0.7}
+                  onPress={handleAddPhoto}
+                >
+                  <Icon name="camera" size={28} color={color} />
+                  <Text style={[s.addText, { color }]}>Ajouter</Text>
+                </TouchableOpacity>
+              )
+            )}
           </View>
         </View>
 
@@ -183,13 +216,13 @@ export default function ChallengeDetailScreen() {
             <Text style={[s.cancelBtnText, { color }]}>Annuler</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[s.validateBtn, current === 0 && s.validateBtnDisabled]}
-            onPress={current > 0 ? handleValidate : undefined}
-            activeOpacity={current > 0 ? 0.85 : 1}
+            style={[s.validateBtn, !canValidate && s.validateBtnDisabled]}
+            onPress={handleValidate}
+            activeOpacity={canValidate ? 0.85 : 1}
           >
             <LinearGradient
               colors={
-                current > 0
+                canValidate
                   ? ([color, "#1A1A2E"] as [string, string])
                   : (["#333", "#333"] as [string, string])
               }
@@ -198,7 +231,9 @@ export default function ChallengeDetailScreen() {
               end={{ x: 1, y: 0 }}
             >
               <Text style={s.validateBtnText}>
-                Valider ({current}/{total})
+                {completeMutation.isPending
+                  ? "Validation…"
+                  : `Valider (${photosTaken}/${requiredPhotos})`}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -206,13 +241,11 @@ export default function ChallengeDetailScreen() {
 
         <View style={{ height: 110 }} />
       </ScrollView>
-
-      <BottomTabBar activeRoute="/(tabs)/quests" />
     </View>
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────
+// ─── Styles ───────────────────────────────────────────────
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bgDeep },
   bgGradient: { position: "absolute", top: 0, left: 0, right: 0, height: 400 },
@@ -313,11 +346,11 @@ const s = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 2,
     backgroundColor: Colors.bgCard,
+    alignItems: "center",
+    justifyContent: "center",
     position: "relative",
   },
   photoSlotEmpty: {
-    alignItems: "center",
-    justifyContent: "center",
     borderStyle: "dashed",
     gap: 8,
   },
@@ -332,6 +365,7 @@ const s = StyleSheet.create({
     backgroundColor: Colors.accentGreen,
     alignItems: "center",
     justifyContent: "center",
+    zIndex: 1,
   },
 
   // Actions
