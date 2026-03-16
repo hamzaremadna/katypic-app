@@ -16,6 +16,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.kaytipic.app",
+      buildNumber: "2",
       infoPlist: {
         NSCameraUsageDescription:
           "KaytiPic needs camera access for photo capture and AI analysis",
