@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Alert,
+  Image,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
@@ -58,6 +59,7 @@ export default function ChallengeDetailScreen() {
   const [photosTaken, setPhotosTaken] = useState(
     Number(params.photosTaken ?? "0")
   );
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
 
   const syncMutation     = useSyncQuestProgress();
   const completeMutation = useCompleteQuest();
@@ -67,7 +69,10 @@ export default function ChallengeDetailScreen() {
     useCallback(() => {
       if (!challengeId) return;
       syncMutation.mutate(challengeId, {
-        onSuccess: (data) => setPhotosTaken(data.photosTaken),
+        onSuccess: (data) => {
+          setPhotosTaken(data.photosTaken);
+          setPhotoUrls(data.photoUrls ?? []);
+        },
       });
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [challengeId])
@@ -182,14 +187,21 @@ export default function ChallengeDetailScreen() {
                 key={`filled-${i}`}
                 style={[s.photoSlot, { borderColor: `${color}60` }]}
               >
-                <LinearGradient
-                  colors={[`${color}20`, `${color}08`]}
-                  style={StyleSheet.absoluteFillObject}
-                />
+                {photoUrls[i] ? (
+                  <Image
+                    source={{ uri: photoUrls[i] }}
+                    style={StyleSheet.absoluteFillObject}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <LinearGradient
+                    colors={[`${color}20`, `${color}08`]}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                )}
                 <View style={s.photoCheck}>
                   <Icon name="check" size={14} color="#fff" />
                 </View>
-                <Icon name="camera" size={28} color={`${color}60`} />
               </View>
             ))}
 

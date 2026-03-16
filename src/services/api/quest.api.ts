@@ -59,7 +59,7 @@ export const questApi = {
   startQuest: (questId: string) =>
     api.post<{ status: QuestStatus }>(`/quests/progress/${questId}/start`, {}),
   syncProgress: (questId: string) =>
-    api.post<{ photosTaken: number; status: QuestStatus }>(
+    api.post<{ photosTaken: number; status: QuestStatus; photoUrls: string[] }>(
       `/quests/progress/${questId}/sync`,
       {}
     ),
