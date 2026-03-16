@@ -23,6 +23,7 @@
     },
     "beta": {
       "distribution": "store",
+      "autoIncrement": true,
       "channel": "preview",
       "ios": { "resourceClass": "m-medium" },
       "env": {
