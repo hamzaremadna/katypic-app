@@ -196,15 +196,17 @@ export default function GalleryScreen() {
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>{totalCount}</Text>
-          <Text style={styles.statLabel}>Photos capturées</Text>
+          <Text style={styles.statLabel}>Capturées</Text>
         </View>
 
         <View style={styles.statDivider} />
 
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>{profileCount}</Text>
-          <Text style={styles.statLabel}>Sur le profil</Text>
+          <Text style={styles.statLabel}>Profil</Text>
         </View>
+
+        <View style={{ flex: 1 }} />
 
         <TouchableOpacity
           style={styles.selectAllButton}
@@ -217,7 +219,8 @@ export default function GalleryScreen() {
             }
           }}
         >
-          <Text style={styles.selectAllText}>Tout sélectionner</Text>
+          <Icon name="check" size={14} color={Colors.textSecondary} />
+          <Text style={styles.selectAllText}>Sélectionner</Text>
         </TouchableOpacity>
       </View>
 
@@ -339,20 +342,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.06)",
   },
-  statItem: { flexDirection: "row", alignItems: "center", gap: 6 },
-  statNumber: { fontSize: 16, fontWeight: "700", color: "#7B2FBE" },
-  statLabel: { fontSize: 13, color: Colors.textSecondary },
+  statItem: { alignItems: "center", gap: 2 },
+  statNumber: { fontSize: 18, fontWeight: "700", color: "#7B2FBE" },
+  statLabel: { fontSize: 11, color: Colors.textSecondary },
   statDivider: {
     width: 1,
-    height: 20,
+    height: 28,
     backgroundColor: "rgba(255,255,255,0.1)",
-    marginHorizontal: 14,
+    marginHorizontal: 16,
   },
   selectAllButton: {
-    marginLeft: "auto",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingVertical: 8,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
     backgroundColor: "rgba(255,255,255,0.04)",
@@ -360,7 +365,7 @@ const styles = StyleSheet.create({
   selectAllText: {
     fontSize: 12,
     color: Colors.textSecondary,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   grid: { flex: 1 },
   gridContent: {
