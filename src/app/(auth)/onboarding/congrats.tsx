@@ -98,7 +98,7 @@ export default function CongratsScreen() {
         {/* Register CTA */}
         <TouchableOpacity
           style={s.registerBtn}
-          onPress={() => router.replace("/(auth)/register")}
+          onPress={() => router.replace("/(auth)/onboarding/trial")}
           activeOpacity={0.85}
         >
           <LinearGradient
