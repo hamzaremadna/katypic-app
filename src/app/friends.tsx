@@ -60,19 +60,25 @@ function FriendCard({
   const color = getAvatarColor(friend.userId);
   return (
     <View style={fc.card}>
-      <View style={fc.avatarWrap}>
-        <View style={[fc.avatar, { backgroundColor: color }]}>
-          <Text style={fc.avatarText}>{getInitials(friend.displayName)}</Text>
+      <TouchableOpacity
+        style={fc.profileArea}
+        activeOpacity={0.7}
+        onPress={() => navigate(`/profile/${friend.userId}`)}
+      >
+        <View style={fc.avatarWrap}>
+          <View style={[fc.avatar, { backgroundColor: color }]}>
+            <Text style={fc.avatarText}>{getInitials(friend.displayName)}</Text>
+          </View>
         </View>
-      </View>
-      <View style={fc.info}>
-        <View style={fc.nameRow}>
-          <Text style={fc.name} numberOfLines={1}>
-            {friend.displayName}
-          </Text>
+        <View style={fc.info}>
+          <View style={fc.nameRow}>
+            <Text style={fc.name} numberOfLines={1}>
+              {friend.displayName}
+            </Text>
+          </View>
+          <Text style={fc.username}>@{friend.username}</Text>
         </View>
-        <Text style={fc.username}>@{friend.username}</Text>
-      </View>
+      </TouchableOpacity>
       <TouchableOpacity style={fc.messageBtn} onPress={onMessage}>
         <Text style={fc.messageBtnText}>Message</Text>
       </TouchableOpacity>
@@ -91,6 +97,7 @@ const fc = StyleSheet.create({
     borderColor: Colors.cardBorder,
     gap: 12,
   },
+  profileArea: { flexDirection: "row", alignItems: "center", flex: 1, gap: 12 },
   avatarWrap: { position: "relative" },
   avatar: {
     width: 50,
@@ -251,15 +258,21 @@ function DiscoverCard({
 
   return (
     <View style={dc.card}>
-      <View style={[dc.avatar, { backgroundColor: color }]}>
-        <Text style={dc.avatarText}>{getInitials(user.displayName)}</Text>
-      </View>
-      <View style={dc.info}>
-        <Text style={dc.name} numberOfLines={1}>
-          {user.displayName}
-        </Text>
-        <Text style={dc.username}>@{user.username}</Text>
-      </View>
+      <TouchableOpacity
+        style={dc.profileArea}
+        activeOpacity={0.7}
+        onPress={() => navigate(`/profile/${user.userId}`)}
+      >
+        <View style={[dc.avatar, { backgroundColor: color }]}>
+          <Text style={dc.avatarText}>{getInitials(user.displayName)}</Text>
+        </View>
+        <View style={dc.info}>
+          <Text style={dc.name} numberOfLines={1}>
+            {user.displayName}
+          </Text>
+          <Text style={dc.username}>@{user.username}</Text>
+        </View>
+      </TouchableOpacity>
       {alreadyFriend ? (
         <View style={dc.statusBadge}>
           <Icon name="check" size={14} color="#2D9B6E" />
@@ -311,6 +324,7 @@ const dc = StyleSheet.create({
     borderColor: Colors.cardBorder,
     gap: 12,
   },
+  profileArea: { flexDirection: "row", alignItems: "center", flex: 1, gap: 12 },
   avatar: {
     width: 46,
     height: 46,

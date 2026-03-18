@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { navigate } from "@/utils/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors, Gradients } from "../../theme/colors";
 import { Fonts } from "../../theme/typography";
 import { Icon } from "../../components/ui/Icon";
@@ -23,6 +23,7 @@ import { profileApi } from "../../services/api/profile.api";
 import { Story } from "../../services/api/story.api";
 import { useUserStories } from "../../hooks/useStories";
 import { StoryViewer } from "../../components/profile/StoryViewer";
+import { hapticLight } from "../../utils/haptics";
 
 const { width } = Dimensions.get("window");
 const PHOTO_SIZE = (width - 40 - 8) / 3;
@@ -50,6 +51,7 @@ function getInitials(name: string): string {
 export default function PublicProfileScreen() {
   const { userId } = useLocalSearchParams<{ userId: string }>();
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<"photos" | "amis">("photos");
 
   const {
     data,
@@ -64,6 +66,7 @@ export default function PublicProfileScreen() {
 
   const profile = data?.profile;
   const photos = data?.photos ?? [];
+  const creativeProfile = data?.creativeProfile;
 
   const displayName =
     profile?.displayName ??
@@ -74,6 +77,23 @@ export default function PublicProfileScreen() {
   const avatarUrl = profile?.avatarUrl;
   const avatarColor = userId ? getAvatarColor(userId) : "#7B2FBE";
   const initials = getInitials(displayName);
+
+  const locationDisplay = useMemo(
+    () =>
+      profile?.city && profile?.country
+        ? `${profile.city}, ${profile.country}`
+        : profile?.city || profile?.country || null,
+    [profile?.city, profile?.country],
+  );
+
+  // Hashtags from creative profile visual preferences
+  const hashtags = useMemo<string[]>(
+    () =>
+      creativeProfile?.visualPreferences?.length
+        ? creativeProfile.visualPreferences.slice(0, 5).map((t) => `#${t}`)
+        : [],
+    [creativeProfile?.visualPreferences],
+  );
 
   const handleShare = () => {
     Share.share({
@@ -139,27 +159,15 @@ export default function PublicProfileScreen() {
       >
         {/* ── Header ── */}
         <View style={s.header}>
-          <LinearGradient
-            colors={["#3D1880", "#1E3A8A"]}
-            style={StyleSheet.absoluteFillObject}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          />
           <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
             <Icon name="arrow-left" size={22} color="#fff" />
           </TouchableOpacity>
-          <Text style={s.headerTitle} numberOfLines={1}>
-            {displayName}
-          </Text>
-          <TouchableOpacity style={s.shareBtn} onPress={handleShare}>
-            <Icon name="share" size={20} color="#fff" />
-          </TouchableOpacity>
         </View>
 
-        {/* ── Avatar + Stats ── */}
+        {/* ── Avatar + Stats row ── */}
         <View style={s.profileHeader}>
           <View style={s.topRow}>
-            {/* Avatar */}
+            {/* Avatar with gradient ring */}
             <View style={s.avatarRingWrap}>
               <LinearGradient
                 colors={Gradients.brand as [string, string]}
@@ -189,33 +197,59 @@ export default function PublicProfileScreen() {
                   <Text style={s.statNumber}>{photos.length}</Text>
                   <Text style={s.statLabel}>Photos</Text>
                 </View>
+                <View style={s.statDivider} />
+                <View style={s.statItem}>
+                  <Text style={s.statNumber}>0</Text>
+                  <Text style={s.statLabel}>Abonnés</Text>
+                </View>
+                <View style={s.statDivider} />
+                <View style={s.statItem}>
+                  <Text style={s.statNumber}>0</Text>
+                  <Text style={s.statLabel}>Abonnements</Text>
+                </View>
               </View>
             </View>
           </View>
         </View>
 
-        {/* ── Name, username & bio ── */}
-        <View style={s.bioSection}>
-          <Text style={s.displayName}>{displayName}</Text>
-          {username && (
-            <Text style={s.usernameText}>@{username}</Text>
-          )}
-          <Text style={s.bioText}>{bio}</Text>
-        </View>
-
-        {/* ── Action buttons ── */}
+        {/* ── Action buttons (like Figma design) ── */}
         <View style={s.actionRow}>
-          <TouchableOpacity style={s.messageBtnWrap} onPress={handleMessage}>
+          <TouchableOpacity style={s.actionBtnPrimary}>
             <LinearGradient
               colors={Gradients.brand as [string, string]}
-              style={s.messageBtnGrad}
+              style={s.actionBtnPrimaryGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
             >
-              <Icon name="message-chat" size={16} color="#fff" />
-              <Text style={s.messageBtnText}>Envoyer un message</Text>
+              <Icon name="user-plus" size={14} color="#fff" />
+              <Text style={s.actionBtnPrimaryText}>Ajouter</Text>
             </LinearGradient>
           </TouchableOpacity>
+
+          <TouchableOpacity style={s.actionBtnDark} onPress={handleMessage}>
+            <Icon name="message-chat" size={14} color={Colors.textSecondary} />
+            <Text style={s.actionBtnDarkText}>message</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={s.actionBtnIcon} onPress={handleShare}>
+            <Icon name="share" size={16} color={Colors.textSecondary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={s.actionBtnIcon}>
+            <Icon name="user-plus" size={16} color={Colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Username & bio ── */}
+        <View style={s.bioSection}>
+          <Text style={s.displayName}>{displayName}</Text>
+          <Text style={s.bioText}>{bio}</Text>
+          {locationDisplay && (
+            <View style={s.locationRow}>
+              <Icon name="marker-pin" size={12} color={Colors.textMuted} />
+              <Text style={s.locationText}>{locationDisplay}</Text>
+            </View>
+          )}
         </View>
 
         {/* ── À la une ── */}
@@ -265,40 +299,80 @@ export default function PublicProfileScreen() {
           </View>
         )}
 
-        {/* ── Section title ── */}
-        <View style={s.sectionHeader}>
-          <Text style={s.sectionTitle}>Photos</Text>
-          <Text style={s.sectionCount}>{photos.length}</Text>
+        {/* ── Hashtags ── */}
+        {hashtags.length > 0 && (
+          <View style={s.hashtagRow}>
+            {hashtags.map((tag) => (
+              <View key={tag} style={s.hashtagPill}>
+                <Text style={s.hashtagText}>{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* ── Tab selector ── */}
+        <View style={s.tabSelector}>
+          {(["photos", "amis"] as const).map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              style={[s.tab, activeTab === tab && s.tabActive]}
+              onPress={() => { hapticLight(); setActiveTab(tab); }}
+            >
+              {activeTab === tab && (
+                <LinearGradient
+                  colors={Gradients.brand as [string, string]}
+                  style={StyleSheet.absoluteFillObject}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                />
+              )}
+              <Icon
+                name={tab === "photos" ? "grid" : "users"}
+                size={14}
+                color={activeTab === tab ? "#fff" : Colors.textMuted}
+              />
+              <Text style={[s.tabText, activeTab === tab && s.tabTextActive]}>
+                {tab === "photos" ? "Photos" : "Amis"}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
-        {/* ── Photo grid ── */}
-        {photos.length === 0 ? (
-          <View style={s.emptyPhotos}>
-            <Icon name="image" size={36} color={Colors.textMuted} />
-            <Text style={s.emptyText}>Aucune photo publique</Text>
-          </View>
+        {/* ── Tab content ── */}
+        {activeTab === "photos" ? (
+          photos.length === 0 ? (
+            <View style={s.emptyPhotos}>
+              <Icon name="image" size={36} color={Colors.textMuted} />
+              <Text style={s.emptyText}>Aucune photo publique</Text>
+            </View>
+          ) : (
+            <View style={s.photoGrid}>
+              {photos.map((photo: { id: string; url?: string }) => (
+                <TouchableOpacity
+                  key={photo.id}
+                  style={s.photoItem}
+                  activeOpacity={0.85}
+                >
+                  {photo.url ? (
+                    <Image
+                      source={{ uri: photo.url }}
+                      style={StyleSheet.absoluteFillObject}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <LinearGradient
+                      colors={["#2D1060", Colors.bgDark]}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )
         ) : (
-          <View style={s.photoGrid}>
-            {photos.map((photo: any) => (
-              <TouchableOpacity
-                key={photo.id}
-                style={s.photoItem}
-                activeOpacity={0.85}
-              >
-                {photo.url ? (
-                  <Image
-                    source={{ uri: photo.url }}
-                    style={StyleSheet.absoluteFillObject}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <LinearGradient
-                    colors={["#2D1060", Colors.bgDark]}
-                    style={StyleSheet.absoluteFillObject}
-                  />
-                )}
-              </TouchableOpacity>
-            ))}
+          <View style={s.emptyPhotos}>
+            <Icon name="users" size={36} color={Colors.textMuted} />
+            <Text style={s.emptyText}>Liste d'amis non disponible</Text>
           </View>
         )}
 
@@ -343,9 +417,8 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingTop: Platform.OS === "ios" ? 56 : 36,
-    paddingBottom: 16,
+    paddingBottom: 8,
     paddingHorizontal: 16,
-    overflow: "hidden",
   },
   backBtn: {
     width: 36,
@@ -353,22 +426,9 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  headerTitle: {
-    flex: 1,
-    textAlign: "center",
-    fontFamily: Fonts.bold,
-    fontSize: 17,
-    color: "#fff",
-  },
-  shareBtn: {
-    width: 36,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 
-  // Profile header
-  profileHeader: { paddingHorizontal: 20, marginTop: 16 },
+  // Profile header (same as my profile)
+  profileHeader: { paddingHorizontal: 20, marginTop: 8 },
   topRow: { flexDirection: "row", alignItems: "center", gap: 16 },
 
   // Avatar
@@ -402,11 +462,15 @@ const s = StyleSheet.create({
 
   // Stats
   statsAndLevel: { flex: 1 },
-  statsRow: { flexDirection: "row", alignItems: "center", gap: 24 },
+  statsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   statItem: { alignItems: "center", gap: 2 },
   statNumber: {
     fontFamily: Fonts.extrabold,
-    fontSize: 20,
+    fontSize: 18,
     color: Colors.textPrimary,
   },
   statLabel: {
@@ -414,31 +478,19 @@ const s = StyleSheet.create({
     fontSize: 12,
     color: Colors.textMuted,
   },
+  statDivider: { width: 1, height: 30, backgroundColor: Colors.divider },
 
-  // Bio section
-  bioSection: { paddingHorizontal: 20, marginTop: 14, gap: 4 },
-  displayName: {
-    fontFamily: Fonts.extrabold,
-    fontSize: 17,
-    color: Colors.textPrimary,
+  // Action buttons (matching Figma: Ajouter | message | share | friend)
+  actionRow: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    gap: 10,
+    marginTop: 16,
+    alignItems: "center",
   },
-  usernameText: {
-    fontFamily: Fonts.medium,
-    fontSize: 14,
-    color: Colors.textMuted,
-  },
-  bioText: {
-    fontFamily: Fonts.regular,
-    fontSize: 14,
-    color: Colors.textSecondary,
-    lineHeight: 20,
-    marginTop: 4,
-  },
-
-  // Action buttons
-  actionRow: { paddingHorizontal: 20, marginTop: 16 },
-  messageBtnWrap: {
-    borderRadius: 12,
+  actionBtnPrimary: {
+    flex: 1,
+    borderRadius: 10,
     overflow: "hidden",
     shadowColor: Colors.gradientPink,
     shadowOpacity: 0.3,
@@ -446,82 +498,65 @@ const s = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 6,
   },
-  messageBtnGrad: {
-    paddingVertical: 13,
+  actionBtnPrimaryGradient: {
+    paddingVertical: 11,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    borderRadius: 12,
+    gap: 6,
+    borderRadius: 10,
   },
-  messageBtnText: {
+  actionBtnPrimaryText: {
     fontFamily: Fonts.bold,
-    fontSize: 15,
+    fontSize: 13,
     color: "#fff",
   },
-
-  // Section header
-  sectionHeader: {
+  actionBtnDark: {
+    flex: 1,
     flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 20,
-    marginTop: 24,
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontFamily: Fonts.extrabold,
-    fontSize: 16,
-    color: Colors.textPrimary,
-  },
-  sectionCount: {
-    fontFamily: Fonts.semibold,
-    fontSize: 13,
-    color: Colors.textMuted,
-  },
-
-  // Photo grid
-  photoGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: 10,
-    gap: 10,
-  },
-  photoItem: {
-    width: PHOTO_SIZE,
-    height: PHOTO_SIZE,
-    borderRadius: 12,
-    overflow: "hidden",
+    gap: 6,
     backgroundColor: Colors.bgCard,
-  },
-
-  // Empty / Error
-  emptyPhotos: {
+    borderRadius: 10,
+    paddingVertical: 11,
     alignItems: "center",
-    paddingTop: 40,
-    gap: 12,
-  },
-  emptyText: {
-    fontFamily: Fonts.regular,
-    fontSize: 15,
-    color: Colors.textMuted,
-  },
-  errorText: {
-    fontFamily: Fonts.semibold,
-    fontSize: 16,
-    color: Colors.textMuted,
-  },
-  retryBtn: {
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 20,
+    justifyContent: "center",
     borderWidth: 1,
     borderColor: Colors.cardBorder,
   },
-  retryText: {
-    fontFamily: Fonts.medium,
+  actionBtnDarkText: {
+    fontFamily: Fonts.semibold,
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  actionBtnIcon: {
+    width: 40,
+    height: 40,
+    backgroundColor: Colors.bgCard,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+
+  // Bio section
+  bioSection: { paddingHorizontal: 20, marginTop: 16, gap: 6 },
+  displayName: {
+    fontFamily: Fonts.extrabold,
+    fontSize: 17,
+    color: Colors.textPrimary,
+  },
+  bioText: {
+    fontFamily: Fonts.regular,
     fontSize: 14,
     color: Colors.textSecondary,
+    lineHeight: 20,
+  },
+  locationRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
+  locationText: {
+    fontFamily: Fonts.medium,
+    fontSize: 13,
+    color: Colors.textMuted,
   },
 
   // À la une stories
@@ -555,5 +590,101 @@ const s = StyleSheet.create({
     fontSize: 11,
     color: Colors.textSecondary,
     textAlign: "center",
+  },
+
+  // Hashtags
+  hashtagRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: 20,
+    marginTop: 14,
+    gap: 8,
+  },
+  hashtagPill: {
+    backgroundColor: "rgba(123,47,190,0.2)",
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(123,47,190,0.3)",
+  },
+  hashtagText: {
+    fontFamily: Fonts.semibold,
+    fontSize: 13,
+    color: Colors.accentPurple,
+  },
+
+  // Tab selector (same as my profile)
+  tabSelector: {
+    flexDirection: "row",
+    marginHorizontal: 20,
+    marginTop: 20,
+    borderRadius: 14,
+    backgroundColor: Colors.bgCard,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 11,
+    overflow: "hidden",
+    gap: 6,
+  },
+  tabActive: {},
+  tabText: {
+    fontFamily: Fonts.semibold,
+    fontSize: 14,
+    color: Colors.textMuted,
+  },
+  tabTextActive: { color: Colors.textPrimary },
+
+  // Photo grid
+  photoGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: 10,
+    marginTop: 16,
+    gap: 4,
+  },
+  photoItem: {
+    width: PHOTO_SIZE,
+    height: PHOTO_SIZE,
+    borderRadius: 4,
+    overflow: "hidden",
+    backgroundColor: Colors.bgCard,
+  },
+
+  // Empty / Error
+  emptyPhotos: {
+    alignItems: "center",
+    paddingTop: 40,
+    gap: 12,
+  },
+  emptyText: {
+    fontFamily: Fonts.regular,
+    fontSize: 15,
+    color: Colors.textMuted,
+  },
+  errorText: {
+    fontFamily: Fonts.semibold,
+    fontSize: 16,
+    color: Colors.textMuted,
+  },
+  retryBtn: {
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  retryText: {
+    fontFamily: Fonts.medium,
+    fontSize: 14,
+    color: Colors.textSecondary,
   },
 });

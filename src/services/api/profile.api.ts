@@ -37,7 +37,7 @@ export const profileApi = {
   }) => api.patch<Profile>("/profiles/me", data),
 
   getPublicProfile: (userId: string) =>
-    api.get<{ profile: Profile; photos: any[] }>(`/profiles/${userId}`),
+    api.get<{ profile: Profile; photos: any[]; creativeProfile: CreativeProfile | null }>(`/profiles/${userId}`),
 
   saveCreativeProfile: (data: {
     musicPreferences: string[];
