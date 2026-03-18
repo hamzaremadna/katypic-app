@@ -19,6 +19,7 @@ import { Colors, Gradients } from "../../theme/colors";
 import { Icon } from "../../components/ui/Icon";
 import { usePhotos, useDeletePhoto } from "../../hooks/usePhotos";
 import { Photo } from "../../services/api/photo.api";
+import { hapticLight } from "../../utils/haptics";
 
 const { width } = Dimensions.get("window");
 const CELL_SIZE = (width - 56) / 2;
@@ -246,6 +247,7 @@ export default function AISelectionScreen() {
   }, [selectedCount]);
 
   const togglePhoto = (id: string) => {
+    hapticLight();
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {

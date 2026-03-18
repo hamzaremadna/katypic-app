@@ -17,4 +17,7 @@ export const authApi = {
 
   getMe: () =>
     apiClient.get<{ id: string; email: string; username: string }>("/auth/me"),
+
+  requestPasswordReset: (email: string) =>
+    apiClient.post<{ message: string }>("/auth/request-password-reset", { email }),
 };

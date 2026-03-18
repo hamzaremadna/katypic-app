@@ -254,11 +254,11 @@ export default function CameraScreen() {
     if (!cameraRef.current) return;
     try {
       // Capture frame (skipProcessing: false ensures JPEG, not HEIC on iOS)
+      // saveToPhotos: false prevents saving to device camera roll
       const frame = await cameraRef.current.takePictureAsync({
         quality: 0.8,
         skipProcessing: false,
-        saveToPhotos: false,
-      });
+      } as Parameters<typeof cameraRef.current.takePictureAsync>[0]);
       if (!frame?.uri) return;
 
       // Resize to max 512px wide at quality 0.6 — reduces payload from ~3MB to ~40KB
@@ -359,10 +359,10 @@ export default function CameraScreen() {
     ]).start();
 
     try {
+      // saveToPhotos: false prevents saving to device camera roll
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.9,
         skipProcessing: false,
-        saveToPhotos: false,
       });
       if (photo) {
         // Navigate to analysis result

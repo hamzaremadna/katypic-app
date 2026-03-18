@@ -433,8 +433,12 @@ export default function HomeScreen() {
               <View style={s.avatarPhoto}>
                 <LinearGradient
                   colors={["#2D1060", "#4D2090"]}
-                  style={{ flex: 1 }}
-                />
+                  style={[{ flex: 1 }, s.avatarInner]}
+                >
+                  <Text style={s.avatarInitial}>
+                    {(user?.username ?? "?")[0].toUpperCase()}
+                  </Text>
+                </LinearGradient>
               </View>
             </View>
             <Text style={s.greeting}>
@@ -551,6 +555,14 @@ const s = StyleSheet.create({
     borderRadius: 55,
     overflow: "hidden",
   },
+  avatarInner: { alignItems: "center", justifyContent: "center" },
+  avatarInitial: {
+    fontFamily: Fonts.bold,
+    fontSize: 38,
+    color: "#fff",
+    includeFontPadding: false,
+  },
+
   greeting: {
     fontFamily: Fonts.regular,
     fontSize: 16,

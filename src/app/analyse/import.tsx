@@ -301,7 +301,7 @@ export default function AnalyseImportScreen() {
         {/* Subtitle */}
         <Animated.View style={[s.subtitleWrap, { opacity: headerFade }]}>
           <Text style={s.subtitle}>
-            Importez une photo pour l'annalyser ...
+            Importez une photo pour l'analyser ...
           </Text>
         </Animated.View>
 

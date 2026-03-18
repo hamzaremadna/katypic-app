@@ -127,7 +127,7 @@ export default function LoginScreen() {
       router.replace("/(tabs)/home");
     } catch (e: unknown) {
       if ((e as { code?: string }).code !== "ERR_REQUEST_CANCELED") {
-        Alert.alert("Erreur", "La connexion Apple a échoué. Réessayez.");
+        hapticError();
       }
     } finally { setIsLoading(false); }
   };
@@ -151,7 +151,7 @@ export default function LoginScreen() {
               <InputField label="Email" placeholder="vous@email.com" value={email} onChangeText={setEmail} icon="mail" keyboardType="email-address" />
               <View style={s.passwordBlock}>
                 <InputField label="Mot de passe" placeholder="········" value={password} onChangeText={setPassword} icon="lock" secureTextEntry showPasswordToggle />
-                <TouchableOpacity style={s.forgotBtn} onPress={() => Alert.alert("Bientôt disponible", "La réinitialisation du mot de passe sera disponible prochainement.")}>
+                <TouchableOpacity style={s.forgotBtn} onPress={() => router.push("/(auth)/forgot-password")}>
                   <Text style={s.forgotText}>Mot de passe oublié ?</Text>
                 </TouchableOpacity>
               </View>
