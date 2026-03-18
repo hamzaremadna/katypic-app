@@ -64,7 +64,7 @@ apiClient.interceptors.response.use(
       await SecureStore.deleteItemAsync("accessToken");
       delete apiClient.defaults.headers.common.Authorization;
       // Lazy-import to avoid circular dependency
-      const { useAuthStore } = require("../stores/authStore");
+      const { useAuthStore } = require("../../stores/authStore");
       const state = useAuthStore.getState();
       if (state.isAuthenticated) {
         state.logout();
