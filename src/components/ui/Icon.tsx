@@ -236,7 +236,7 @@ interface IconProps {
   strokeWidth?: number;
 }
 
-export function Icon({
+export const Icon = React.memo(function Icon({
   name,
   size = 24,
   color = "#FFFFFF",
@@ -264,7 +264,10 @@ export function Icon({
 
   // Standard icons (24×24 viewBox, stroke-only)
   const paths = ICONS[name as keyof typeof ICONS];
-  if (!paths) return null;
+  if (!paths) {
+    if (__DEV__) console.warn(`[Icon] Unknown icon name: "${name}"`);
+    return null;
+  }
 
   return (
     <Svg
@@ -282,4 +285,4 @@ export function Icon({
       ))}
     </Svg>
   );
-}
+});

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -101,7 +101,10 @@ export default function RegisterScreen() {
       .finally(() => setIsLoading(false));
   };
 
+  const isSubmitting = useRef(false);
+
   const handleRegister = async () => {
+    if (isSubmitting.current) return;
     setValidationError(null);
     clearError();
 
@@ -116,6 +119,7 @@ export default function RegisterScreen() {
     if (password.length < 8) { hapticError(); setValidationError("Le mot de passe doit contenir au moins 8 caractères."); return; }
 
     hapticLight();
+    isSubmitting.current = true;
     setIsLoading(true);
     try {
       await register(email.trim(), trimmedUsername, password);
@@ -123,9 +127,9 @@ export default function RegisterScreen() {
       router.replace("/(tabs)/home");
     } catch {
       hapticError();
-      // storeError is already set by the store — ErrorBanner will show it
     } finally {
       setIsLoading(false);
+      isSubmitting.current = false;
     }
   };
 

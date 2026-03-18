@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { Icon } from "../../components/ui/Icon";
 import { Colors, Gradients } from "../../theme/colors";
 import { KaytiHeader, BottomTabBar } from "../../components/ui";
@@ -41,7 +41,10 @@ export default function GalleryScreen() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // ── Real data ──
-  const { data, isLoading } = usePhotos();
+  const { data, isLoading, refetch } = usePhotos();
+
+  // Refetch photos when screen gains focus (e.g. after deleting elsewhere)
+  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
   const photos: Photo[] = data?.photos ?? [];
   const totalCount = data?.total ?? 0;
   const deletePhoto = useDeletePhoto();
@@ -115,8 +118,12 @@ export default function GalleryScreen() {
           style: "destructive",
           onPress: async () => {
             const ids = Array.from(selectedIds);
-            for (const id of ids) {
-              await deletePhoto.mutateAsync(id);
+            const results = await Promise.allSettled(
+              ids.map((id) => deletePhoto.mutateAsync(id)),
+            );
+            const failed = results.filter((r) => r.status === "rejected");
+            if (failed.length > 0) {
+              Alert.alert("Erreur", `${failed.length} photo(s) n'ont pas pu être supprimées.`);
             }
             setSelectedIds(new Set());
             setSelectionMode(false);

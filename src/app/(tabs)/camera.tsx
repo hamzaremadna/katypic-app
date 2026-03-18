@@ -8,6 +8,7 @@ import {
   Platform,
   Animated,
   ActivityIndicator,
+  Linking,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { CameraView, useCameraPermissions, CameraType } from "expo-camera";
@@ -88,9 +89,15 @@ function PermissionScreen({ onRequest }: { onRequest: () => void }) {
             <Text style={perm.btnText}>Autoriser l'accès</Text>
           </LinearGradient>
         </TouchableOpacity>
-        <Text style={perm.hint}>
-          Vous pouvez modifier cette autorisation dans les réglages.
-        </Text>
+        <TouchableOpacity
+          onPress={() => Linking.openSettings()}
+          activeOpacity={0.7}
+          style={perm.settingsLink}
+        >
+          <Text style={perm.hint}>
+            Permission refusée ? <Text style={perm.settingsText}>Ouvrir les réglages</Text>
+          </Text>
+        </TouchableOpacity>
       </Animated.View>
     </View>
   );
@@ -161,6 +168,14 @@ const perm = StyleSheet.create({
     color: Colors.textMuted,
     textAlign: "center",
     marginTop: 4,
+  },
+  settingsLink: {
+    paddingVertical: 8,
+  },
+  settingsText: {
+    color: Colors.gradientPink,
+    fontWeight: "600",
+    textDecorationLine: "underline",
   },
 });
 

@@ -172,9 +172,10 @@ export default function QuestionnaireScreen() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   // Restore accumulated answers from params (preserved across question↔feature navigation)
   const answersParam = useLocalSearchParams<{ answers: string }>().answers;
-  const [answers, setAnswers] = useState<Record<string, string | string[]>>(
-    answersParam ? JSON.parse(answersParam) : {}
-  );
+  const [answers, setAnswers] = useState<Record<string, string | string[]>>(() => {
+    if (!answersParam) return {};
+    try { return JSON.parse(answersParam); } catch { return {}; }
+  });
 
   const headerFade = useRef(new Animated.Value(0)).current;
   const contentSlide = useRef(new Animated.Value(30)).current;

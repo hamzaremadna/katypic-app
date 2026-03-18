@@ -76,22 +76,30 @@ export function useUploadPhoto() {
         fileSize = width * height * 0.5; // rough estimate
       } else {
         // ── Production: S3 presigned PUT URL ──
-        const fileResp = await fetch(photoUri);
-        const blob = await fileResp.blob();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-        const s3Resp = await fetch(uploadData.uploadUrl, {
-          method: "PUT",
-          body: blob,
-          headers: { "Content-Type": "image/jpeg" },
-        });
+        try {
+          const fileResp = await fetch(photoUri);
+          const blob = await fileResp.blob();
 
-        if (!s3Resp.ok) {
-          throw new Error(`S3 upload failed: ${s3Resp.status}`);
+          const s3Resp = await fetch(uploadData.uploadUrl, {
+            method: "PUT",
+            body: blob,
+            headers: { "Content-Type": "image/jpeg" },
+            signal: controller.signal,
+          });
+
+          if (!s3Resp.ok) {
+            throw new Error(`S3 upload failed: ${s3Resp.status}`);
+          }
+
+          photoUrl = uploadData.publicUrl;
+          s3Key = uploadData.key;
+          fileSize = blob.size;
+        } finally {
+          clearTimeout(timeoutId);
         }
-
-        photoUrl = uploadData.publicUrl;
-        s3Key = uploadData.key;
-        fileSize = blob.size;
       }
 
       // 3. Create the photo record in the backend

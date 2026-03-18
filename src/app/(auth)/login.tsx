@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -94,19 +94,23 @@ export default function LoginScreen() {
       .finally(() => setIsLoading(false));
   };
 
+  const isSubmitting = useRef(false);
+
   const handleLogin = async () => {
+    if (isSubmitting.current) return;
     setValidationError(null);
     clearError();
     const trimmedEmail = email.trim();
     if (!trimmedEmail) { hapticError(); setValidationError("Veuillez entrer votre email"); return; }
     if (!password) { hapticError(); setValidationError("Veuillez entrer votre mot de passe"); return; }
     hapticLight();
+    isSubmitting.current = true;
     setIsLoading(true);
     try {
       await login(trimmedEmail, password);
       hapticSuccess();
       router.replace("/(tabs)/home");
-    } catch { hapticError(); } finally { setIsLoading(false); }
+    } catch { hapticError(); } finally { setIsLoading(false); isSubmitting.current = false; }
   };
 
   const handleAppleLogin = async () => {

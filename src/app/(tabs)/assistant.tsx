@@ -49,7 +49,11 @@ export default function AssistantScreen() {
 
   const displayError = sessionError || chatError;
 
+  const isCreatingSession = useRef(false);
+
   const initSession = useCallback(async () => {
+    if (isCreatingSession.current) return;
+    isCreatingSession.current = true;
     try {
       setSessionError(null);
       const session = await createSession();
@@ -58,6 +62,8 @@ export default function AssistantScreen() {
       setSessionError(
         "Impossible de démarrer la session. Vérifiez votre connexion et réessayez.",
       );
+    } finally {
+      isCreatingSession.current = false;
     }
   }, [createSession]);
 
@@ -88,12 +94,26 @@ export default function AssistantScreen() {
     }
   }, [sessionId, clearError, initSession]);
 
+  const pendingMessage = useRef<string | null>(null);
+
   const handleSend = useCallback(
     (text: string) => {
       if (!text.trim() || !sessionId) return;
+      const trimmed = text.trim();
+      pendingMessage.current = trimmed;
       setInputText("");
       setSelectedQuestion(null);
-      sendMutation.mutate({ content: text.trim() });
+      sendMutation.mutate(
+        { content: trimmed },
+        {
+          onSuccess: () => { pendingMessage.current = null; },
+          onError: () => {
+            // Restore message so user doesn't lose it
+            if (pendingMessage.current) setInputText(pendingMessage.current);
+            pendingMessage.current = null;
+          },
+        },
+      );
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 100);

@@ -56,6 +56,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   error: null,
 
   loadToken: async () => {
+    // Timeout guard: if loadToken takes > 10s (e.g. server unreachable), mark ready anyway
+    const timeout = setTimeout(() => set({ isReady: true }), 10000);
     try {
       const token = await SecureStore.getItemAsync("accessToken");
       if (token) {
@@ -73,6 +75,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
     } catch {
       set({ isReady: true });
+    } finally {
+      clearTimeout(timeout);
     }
   },
 

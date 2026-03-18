@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
+import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import { navigate } from "@/utils/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -24,7 +25,7 @@ import { useSettingsStore } from "../../stores/settingsStore";
 import { profileApi } from "../../services/api/profile.api";
 
 // ─── Constants ────────────────────────────────────────────
-const APP_VERSION = "1.0.0";
+const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
 
 // ─── Row component ────────────────────────────────────────
 function SettingRow({
@@ -97,12 +98,17 @@ export default function SettingsScreen() {
     if (profile) setIsPublic(profile.isPublic ?? true);
   }, [profile]);
 
+  const toggleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleTogglePublic = useCallback(
     (val: boolean) => {
       setIsPublic(val);
-      profileApi.updateProfile({ isPublic: val }).then(() => {
-        queryClient.invalidateQueries({ queryKey: ["profile", "me"] });
-      });
+      if (toggleTimer.current) clearTimeout(toggleTimer.current);
+      toggleTimer.current = setTimeout(() => {
+        profileApi.updateProfile({ isPublic: val }).then(() => {
+          queryClient.invalidateQueries({ queryKey: ["profile", "me"] });
+        });
+      }, 500);
     },
     [queryClient],
   );

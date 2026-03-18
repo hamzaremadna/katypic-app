@@ -59,9 +59,16 @@ apiClient.interceptors.response.use(
   async (error) => {
     const config = error.config;
 
-    // Handle 401: clear token
+    // Handle 401: clear token and force logout
     if (error.response?.status === 401) {
       await SecureStore.deleteItemAsync("accessToken");
+      delete apiClient.defaults.headers.common.Authorization;
+      // Lazy-import to avoid circular dependency
+      const { useAuthStore } = require("../stores/authStore");
+      const state = useAuthStore.getState();
+      if (state.isAuthenticated) {
+        state.logout();
+      }
       return Promise.reject(error);
     }
 
