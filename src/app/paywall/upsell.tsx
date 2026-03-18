@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Platform,
-  ScrollView,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
@@ -95,57 +94,52 @@ export default function UpsellScreen() {
         style={StyleSheet.absoluteFillObject}
       />
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={s.scroll}
+      {/* ── Top area (close + mascot + title) ── */}
+      <TouchableOpacity
+        style={s.closeBtn}
+        onPress={() => router.back()}
+        hitSlop={12}
       >
-        {/* Close */}
-        <TouchableOpacity
-          style={s.closeBtn}
-          onPress={() => router.back()}
-          hitSlop={12}
-        >
-          <Icon name="x" size={22} color={Colors.textSecondary} />
-        </TouchableOpacity>
+        <Icon name="x" size={22} color={Colors.textSecondary} />
+      </TouchableOpacity>
 
-        {/* Mascot */}
-        <View style={s.mascotWrap}>
-          <Mascot size={130} />
+      <View style={s.mascotWrap}>
+        <Mascot size={100} />
+      </View>
+
+      <Text style={s.title}>Offre exclusive !</Text>
+      <Text style={s.subtitle}>Passez au plan Pro maintenant</Text>
+
+      {/* ── Big unified card (flex: 1, centered) ── */}
+      <View style={s.bigCard}>
+        {/* Price comparison */}
+        <View style={s.priceSection}>
+          <View style={s.priceCompare}>
+            <Text style={s.priceOld}>24,99€</Text>
+            <Text style={s.priceArrow}>→</Text>
+            <Text style={s.priceDiff}>+12,50€</Text>
+          </View>
+          <Text style={s.priceNote}>
+            Seulement 12,50€ de plus par mois
+          </Text>
         </View>
 
-        {/* Title */}
-        <Text style={s.title}>Offre exclusive !</Text>
-        <Text style={s.subtitle}>Passez au plan Pro maintenant</Text>
-
-        {/* ── Big unified card: price + features + limited badge ── */}
-        <View style={s.bigCard}>
-          {/* Price comparison */}
-          <View style={s.priceSection}>
-            <View style={s.priceCompare}>
-              <Text style={s.priceOld}>24,99€</Text>
-              <Text style={s.priceArrow}>→</Text>
-              <Text style={s.priceDiff}>+12,50€</Text>
-            </View>
-            <Text style={s.priceNote}>
-              Seulement 12,50€ de plus par mois
-            </Text>
-          </View>
-
-          {/* Features inside the card */}
-          <View style={s.featuresSection}>
-            {FEATURES.map((f) => (
-              <FeatureRow key={f.title} feature={f} />
-            ))}
-          </View>
-
-          {/* Limited badge inside the card */}
-          <View style={s.limitedBadge}>
-            <View style={s.redDot} />
-            <Text style={s.limitedText}>Offre valable 24h seulement</Text>
-          </View>
+        {/* Features inside the card */}
+        <View style={s.featuresSection}>
+          {FEATURES.map((f) => (
+            <FeatureRow key={f.title} feature={f} />
+          ))}
         </View>
 
-        {/* CTA */}
+        {/* Limited badge inside the card */}
+        <View style={s.limitedBadge}>
+          <View style={s.redDot} />
+          <Text style={s.limitedText}>Offre valable 24h seulement</Text>
+        </View>
+      </View>
+
+      {/* ── Bottom: CTA + skip pinned ── */}
+      <View style={s.bottomArea}>
         <TouchableOpacity
           style={s.ctaWrap}
           onPress={handleUpgrade}
@@ -161,13 +155,10 @@ export default function UpsellScreen() {
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* Skip */}
         <TouchableOpacity style={s.skipBtn} onPress={handleSkip}>
           <Text style={s.skipText}>Non merci, continuer avec Premium</Text>
         </TouchableOpacity>
-
-        <View style={{ height: 40 }} />
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -176,7 +167,6 @@ export default function UpsellScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bgDeep },
-  scroll: { paddingBottom: 20 },
   closeBtn: {
     marginTop: Platform.OS === "ios" ? 56 : 36,
     marginLeft: 20,
@@ -192,7 +182,7 @@ const s = StyleSheet.create({
   },
 
   // Mascot
-  mascotWrap: { alignItems: "center", marginTop: 16 },
+  mascotWrap: { alignItems: "center", marginTop: 8 },
 
   // Title
   title: {
@@ -200,20 +190,20 @@ const s = StyleSheet.create({
     fontSize: 26,
     color: Colors.accentGreen,
     textAlign: "center",
-    marginTop: 16,
+    marginTop: 10,
   },
   subtitle: {
     fontFamily: Fonts.regular,
     fontSize: 15,
     color: Colors.textSecondary,
     textAlign: "center",
-    marginTop: 6,
+    marginTop: 4,
   },
 
   // ── Big unified card ──
   bigCard: {
     marginHorizontal: 20,
-    marginTop: 24,
+    marginTop: 16,
     backgroundColor: Colors.bgCard,
     borderRadius: 20,
     overflow: "hidden",
@@ -224,8 +214,8 @@ const s = StyleSheet.create({
   // Price section (top of card)
   priceSection: {
     paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 20,
+    paddingTop: 16,
+    paddingBottom: 14,
     alignItems: "center",
     gap: 8,
   },
@@ -267,13 +257,13 @@ const s = StyleSheet.create({
     gap: 12,
     backgroundColor: "rgba(255,255,255,0.04)",
     borderRadius: 14,
-    paddingVertical: 12,
+    paddingVertical: 8,
     paddingHorizontal: 14,
   },
   featureIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -316,10 +306,15 @@ const s = StyleSheet.create({
     color: "#F6339A",
   },
 
+  // Bottom pinned area
+  bottomArea: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: Platform.OS === "ios" ? 34 : 20,
+  },
+
   // CTA
   ctaWrap: {
-    marginHorizontal: 24,
-    marginTop: 24,
     borderRadius: 16,
     overflow: "hidden",
     shadowColor: "#F6339A",

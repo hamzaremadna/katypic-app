@@ -10,7 +10,7 @@ import { KaytiHeader, GradientButton } from "../../../components/ui";
 
 const { width } = Dimensions.get("window");
 const CHART_W = width - 110;
-const CHART_H = 75;
+const CHART_H = 100;
 
 // ─── Animated Counter ────────────────────────────────────
 function AnimatedNumber({ target, suffix = "" }: { target: number; suffix?: string }) {
@@ -147,7 +147,7 @@ const ch = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.cardBorder,
   },
-  inner: { padding: 10, borderRadius: 12 },
+  inner: { padding: 14, borderRadius: 12 },
   title: {
     fontSize: 12,
     fontWeight: "800",
@@ -331,12 +331,7 @@ function QuestPathCard({ path, delay }: { path: QuestPath; delay: number }) {
       </View>
 
       <View style={qc.titleRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={qc.title}>{path.title}</Text>
-          <Text style={qc.subtitle} numberOfLines={2}>
-            {path.subtitle}
-          </Text>
-        </View>
+        <Text style={qc.title}>{path.title}</Text>
         <View style={[qc.iconCircle, { borderColor: `${path.iconColor}40` }]}>
           <Icon name={path.icon} size={15} color={path.iconColor} />
         </View>
@@ -358,8 +353,8 @@ const qc = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
     borderWidth: 1,
-    padding: 10,
-    gap: 5,
+    padding: 8,
+    gap: 3,
     marginHorizontal: 20,
   },
   topRow: {
@@ -375,15 +370,8 @@ const qc = StyleSheet.create({
     letterSpacing: 0.5,
   },
   count: { fontSize: 10, fontWeight: "600", color: Colors.textSecondary },
-  titleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  title: { fontSize: 15, fontWeight: "800", color: Colors.textPrimary },
-  subtitle: {
-    fontSize: 10,
-    fontWeight: "400",
-    color: Colors.textSecondary,
-    lineHeight: 13,
-    marginTop: 1,
-  },
+  titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  title: { fontSize: 14, fontWeight: "800", color: Colors.textPrimary },
   iconCircle: {
     width: 32,
     height: 32,
@@ -477,7 +465,7 @@ export default function ProgressScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bgDeep },
-  scroll: { paddingBottom: 40, gap: 10 },
+  scroll: { paddingBottom: 40, gap: 8 },
   bgGlow: { position: "absolute", top: 0, left: 0, right: 0, height: 250 },
   hero: { paddingHorizontal: 20 },
   heroIcon: { fontSize: 16, color: Colors.textPrimary },
@@ -501,9 +489,9 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
   },
   questsTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: Colors.textPrimary,
+    fontSize: 13,
+    fontWeight: "600",
+    color: Colors.textMuted,
     paddingHorizontal: 20,
     textAlign: "center",
   },

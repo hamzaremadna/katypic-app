@@ -6,7 +6,6 @@ import {
   Dimensions,
   Animated,
   Platform,
-  ScrollView,
   Image,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -157,14 +156,10 @@ export default function SpotsScreen() {
         style={StyleSheet.absoluteFillObject}
       />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      {/* Scrollable content area */}
+      <View style={styles.content}>
         {/* Header */}
         <Animated.View style={[styles.header, { opacity: headerFade }]}>
-          {/* KaytiPic logo top bar */}
-          {/* <View style={styles.logoBar}>
-            <Text style={styles.logoKayti}>Kayti</Text>
-            <Text style={styles.logoPic}>Pic</Text>
-          </View> */}
           <Text style={styles.title}>Découvrez les{"\n"}meilleurs spots</Text>
           <Text style={styles.subtitle}>
             Des milliers de spots photo{"\n"}géolocalisés près de chez vous
@@ -230,10 +225,12 @@ export default function SpotsScreen() {
             ),
           )}
         </Animated.View>
+      </View>
 
-        {/* Next button */}
-        <GradientButton label="Suivant" onPress={handleNext} style={styles.cta} />
-      </ScrollView>
+      {/* Button pinned at bottom */}
+      <View style={styles.ctaContainer}>
+        <GradientButton label="Suivant" onPress={handleNext} />
+      </View>
     </View>
   );
 }
@@ -243,11 +240,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.bgDeep,
   },
-  scrollContent: {
-    paddingTop: Platform.OS === "ios" ? 60 : 40,
+  content: {
+    flex: 1,
+    paddingTop: Platform.OS === "ios" ? 50 : 30,
     paddingHorizontal: 20,
-    paddingBottom: 50,
-    gap: 14,
+    gap: 12,
+  },
+  ctaContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === "ios" ? 34 : 20,
+    paddingTop: 12,
   },
 
   // Logo bar
@@ -287,7 +289,7 @@ const styles = StyleSheet.create({
   mapCard: {
     borderRadius: 20,
     overflow: "hidden",
-    height: 200,
+    height: 160,
     shadowColor: Colors.gradientPurple,
     shadowOpacity: 0.4,
     shadowRadius: 20,
@@ -338,8 +340,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.cardBorder,
   },
   spotThumbnail: {
-    width: 70,
-    height: 70,
+    width: 60,
+    height: 60,
     borderRadius: 12,
     overflow: "hidden",
   },
@@ -384,8 +386,8 @@ const styles = StyleSheet.create({
   featuresList: {
     backgroundColor: "rgba(20,20,36,0.7)",
     borderRadius: 16,
-    padding: 16,
-    gap: 12,
+    padding: 12,
+    gap: 8,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
   },

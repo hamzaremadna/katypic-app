@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Platform,
   Dimensions,
+  Animated,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
@@ -44,6 +45,22 @@ function GradientText({ text, style }: { text: string; style: any }) {
 export default function PaywallIntroScreen() {
   const router = useRouter();
 
+  const mascotAnim = useRef(new Animated.Value(0)).current;
+  const textAnim = useRef(new Animated.Value(0)).current;
+  const ctaAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(24)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(slideAnim, { toValue: 0, tension: 60, friction: 10, useNativeDriver: true }),
+      Animated.stagger(120, [
+        Animated.timing(mascotAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(textAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(ctaAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+      ]),
+    ]).start();
+  }, []);
+
   return (
     <View style={s.container}>
       <StatusBar style="light" />
@@ -81,33 +98,39 @@ export default function PaywallIntroScreen() {
 
       {/* ── Center content: mascot + title ── */}
       <View style={s.centerContent}>
-        <Mascot size={200} />
-        <View style={s.textSection}>
+        <Animated.View style={{ opacity: mascotAnim, transform: [{ translateY: slideAnim }] }}>
+          <Mascot size={200} />
+        </Animated.View>
+
+        <Animated.View style={[s.textSection, { opacity: textAnim }]}>
           <GradientText text="C'est parti !" style={s.title} />
           <Text style={s.subtitle}>
             C'est le moment de{"\n"}choisir votre plan
           </Text>
-        </View>
-        <TouchableOpacity
-          style={s.ctaWrap}
-          onPress={() => navigate("/paywall/plans")}
-          activeOpacity={0.85}
-        >
-          <LinearGradient
-            colors={Gradients.paywall}
-            style={s.ctaGradient}
-            start={PW_START}
-            end={PW_END}
-          >
-            <Text style={s.ctaText}>Découvrir les offres</Text>
-            <Icon name="sparkles" size={16} color="#fff" />
-          </LinearGradient>
-        </TouchableOpacity>
+        </Animated.View>
 
-        {/* Pink star below CTA */}
-        <View style={s.decorStar}>
-          <Icon name="decor-star" size={29} color="#FB64B6" />
-        </View>
+        <Animated.View style={{ opacity: ctaAnim, width: "100%" }}>
+          <TouchableOpacity
+            style={s.ctaWrap}
+            onPress={() => navigate("/paywall/plans")}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={Gradients.paywall}
+              style={s.ctaGradient}
+              start={PW_START}
+              end={PW_END}
+            >
+              <Text style={s.ctaText}>Découvrir les offres</Text>
+              <Icon name="sparkles" size={16} color="#fff" />
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Pink star below CTA */}
+          <View style={s.decorStar}>
+            <Icon name="decor-star" size={29} color="#FB64B6" />
+          </View>
+        </Animated.View>
       </View>
     </View>
   );
