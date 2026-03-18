@@ -16,7 +16,7 @@ interface AuthState {
   isReady: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, username: string, password: string) => Promise<void>;
+  register: (email: string, username: string, password: string, displayName?: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
   loginWithApple: (identityToken: string, fullName?: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -87,10 +87,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  register: async (email, username, password) => {
+  register: async (email, username, password, displayName) => {
     try {
       set({ error: null });
-      const { data } = await authApi.register(email, username, password);
+      const { data } = await authApi.register(email, username, password, displayName);
       await persistAuth(set, data);
     } catch (err: unknown) {
       set({ error: parseApiError(err, "Registration failed") });

@@ -21,6 +21,7 @@ import { KaytiHeader, InputField } from "../../components/ui";
 import { Icon } from "../../components/ui/Icon";
 import { GoogleIcon } from "../../components/ui/GoogleIcon";
 import { useAuthStore } from "../../stores/authStore";
+import { hapticLight, hapticSuccess, hapticError } from "../../utils/haptics";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -29,7 +30,12 @@ const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 function translateError(raw: string | null): string | null {
   if (!raw) return null;
   if (raw.includes("Email already in use")) return "Cet email est déjà utilisé. Connectez-vous.";
-  if (raw.includes("Username already taken")) return "Ce nom d'utilisateur est déjà pris.";
+  if (raw.includes("Username already taken")) return "Ce nom d'utilisateur est déjà pris. Essayez un autre.";
+  if (raw.includes("Username can only contain")) return "Le nom ne peut contenir que des lettres, chiffres et underscores.";
+  if (raw.includes("must be longer than or equal to 3") || raw.includes("at least 3")) return "Le nom doit contenir au moins 3 caractères.";
+  if (raw.includes("must be shorter than or equal to 30") || raw.includes("at most 30")) return "Le nom ne peut pas dépasser 30 caractères.";
+  if (raw.includes("must be longer than or equal to 8") || raw.includes("at least 8")) return "Le mot de passe doit contenir au moins 8 caractères.";
+  if (raw.includes("email must be an email") || raw.includes("Invalid email")) return "L'adresse email n'est pas valide.";
   if (raw.includes("Invalid credentials")) return "Email ou mot de passe incorrect.";
   if (raw.includes("Network Error") || raw.includes("Network error")) return "Impossible de joindre le serveur. Vérifiez votre connexion.";
   if (raw.includes("timeout") || raw.toLowerCase().includes("timeout")) return "La requête a expiré. Réessayez.";
@@ -90,8 +96,8 @@ export default function RegisterScreen() {
   const handleGoogleSuccess = (idToken: string) => {
     setIsLoading(true);
     loginWithGoogle(idToken)
-      .then(() => router.replace("/(tabs)/home"))
-      .catch(() => {})
+      .then(() => { hapticSuccess(); router.replace("/(tabs)/home"); })
+      .catch(() => hapticError()) // storeError already set — ErrorBanner shows it
       .finally(() => setIsLoading(false));
   };
 
@@ -99,18 +105,25 @@ export default function RegisterScreen() {
     setValidationError(null);
     clearError();
 
-    if (!name.trim()) { setValidationError("Veuillez entrer votre nom."); return; }
-    if (!email.trim()) { setValidationError("Veuillez entrer votre email."); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setValidationError("L'adresse email n'est pas valide."); return; }
-    if (!password) { setValidationError("Veuillez créer un mot de passe."); return; }
-    if (password.length < 8) { setValidationError("Le mot de passe doit contenir au moins 8 caractères."); return; }
+    const trimmedUsername = name.trim();
+    if (trimmedUsername.length < 3) { hapticError(); setValidationError("Le nom d'utilisateur doit contenir au moins 3 caractères."); return; }
+    if (trimmedUsername.length > 30) { hapticError(); setValidationError("Le nom d'utilisateur ne peut pas dépasser 30 caractères."); return; }
+    if (!/^[a-zA-Z0-9_]+$/.test(trimmedUsername)) { hapticError(); setValidationError("Le nom ne peut contenir que des lettres, chiffres et underscores."); return; }
 
+    if (!email.trim()) { hapticError(); setValidationError("Veuillez entrer votre email."); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { hapticError(); setValidationError("L'adresse email n'est pas valide."); return; }
+    if (!password) { hapticError(); setValidationError("Veuillez créer un mot de passe."); return; }
+    if (password.length < 8) { hapticError(); setValidationError("Le mot de passe doit contenir au moins 8 caractères."); return; }
+
+    hapticLight();
     setIsLoading(true);
     try {
-      await register(email.trim(), name.trim(), password);
+      await register(email.trim(), trimmedUsername, password);
+      hapticSuccess();
       router.replace("/(tabs)/home");
     } catch {
-      // error is already set in the store
+      hapticError();
+      // storeError is already set by the store — ErrorBanner will show it
     } finally {
       setIsLoading(false);
     }
@@ -134,7 +147,7 @@ export default function RegisterScreen() {
       router.replace("/(tabs)/home");
     } catch (e: unknown) {
       if ((e as { code?: string }).code !== "ERR_REQUEST_CANCELED") {
-        Alert.alert("Erreur", "La connexion Apple a échoué. Réessayez.");
+        hapticError(); // storeError already set — ErrorBanner will display it
       }
     } finally {
       setIsLoading(false);
@@ -170,11 +183,12 @@ export default function RegisterScreen() {
 
             <View style={s.form}>
               <InputField
-                label="Nom complet"
-                placeholder="John Doe"
+                label="Nom d'utilisateur"
+                placeholder="john_doe"
                 value={name}
                 onChangeText={setName}
                 icon="user"
+                autoCapitalize="none"
               />
               <InputField
                 label="Email"
@@ -191,6 +205,7 @@ export default function RegisterScreen() {
                 onChangeText={setPassword}
                 icon="lock"
                 secureTextEntry
+                showPasswordToggle
                 hint="Minimum 8 caractères"
               />
             </View>

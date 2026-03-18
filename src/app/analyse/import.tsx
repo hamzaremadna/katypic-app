@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import { useRouter } from "expo-router";
 import { navigate } from "@/utils/navigation";
 import * as ImagePicker from "expo-image-picker";
 import { Colors, Gradients } from "../../theme/colors";
-import { KaytiHeader, BottomTabBar } from "../../components/ui";
+import { KaytiHeader } from "../../components/ui";
 import { TourOverlay } from "../../components/tour/TourOverlay";
 import { TOUR_ANALYSE } from "../../data/tours";
 import { useTourStore } from "../../stores/tourStore";
@@ -32,13 +32,16 @@ function AISelectionModal({
   visible,
   onClose,
   onSelect,
+  counts,
 }: {
   visible: boolean;
   onClose: () => void;
   onSelect: (type: string) => void;
+  counts: { all: number; doublon: number; yeux: number; flou: number };
 }) {
   const slideAnim = useRef(new Animated.Value(400)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [selectedType, setSelectedType] = useState("all");
 
   useEffect(() => {
     if (visible) {
@@ -59,22 +62,10 @@ function AISelectionModal({
   }, [visible]);
 
   const types = [
-    {
-      id: "all",
-      label: "Tous les problèmes",
-      count: 5,
-      icon: "✦",
-      selected: true,
-    },
-    { id: "doublon", label: "Doublons", count: 2, icon: "⧉", selected: false },
-    { id: "yeux", label: "Yeux fermés", count: 2, icon: "◉", selected: false },
-    {
-      id: "flou",
-      label: "Photos floues",
-      count: 1,
-      icon: "◎",
-      selected: false,
-    },
+    { id: "all", label: "Tous les problèmes", count: counts.all, icon: "✦" },
+    { id: "doublon", label: "Doublons", count: counts.doublon, icon: "⧉" },
+    { id: "yeux", label: "Yeux fermés", count: counts.yeux, icon: "◉" },
+    { id: "flou", label: "Photos floues", count: counts.flou, icon: "◎" },
   ];
 
   return (
@@ -109,13 +100,13 @@ function AISelectionModal({
             {types.map((t, i) => (
               <TouchableOpacity
                 key={t.id}
-                style={[m.typeRow, t.selected && m.typeRowSelected]}
-                onPress={() => onSelect(t.id)}
+                style={[m.typeRow, selectedType === t.id && m.typeRowSelected]}
+                onPress={() => setSelectedType(t.id)}
                 activeOpacity={0.8}
               >
                 <LinearGradient
                   colors={
-                    t.selected
+                    selectedType === t.id
                       ? Gradients.purpleBlue
                       : ["transparent", "transparent"]
                   }
@@ -130,14 +121,14 @@ function AISelectionModal({
             ))}
           </View>
 
-          <TouchableOpacity style={m.manualBtn} onPress={onClose}>
+          <TouchableOpacity style={m.manualBtn} onPress={() => onSelect(selectedType)}>
             <LinearGradient
               colors={Gradients.purpleBlue}
               style={m.manualBtnGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
             >
-              <Text style={m.manualBtnText}>Sélection manuelle</Text>
+              <Text style={m.manualBtnText}>Suivant</Text>
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
@@ -246,6 +237,27 @@ export default function AnalyseImportScreen() {
   // ── Real photos ──
   const { data: photosData } = usePhotos();
   const recentPhotos = photosData?.photos?.slice(0, 6) ?? [];
+
+  // ── Anomaly counts for AI Selection modal ──
+  const anomalies = useMemo(() => {
+    const photos = photosData?.photos ?? [];
+    const flou = photos.filter(
+      (p) => (p.analyses?.[0]?.technicalScore ?? 100) < 50
+    );
+    const yeux = photos.filter(
+      (p) => (p.analyses?.[0]?.compositionScore ?? 100) < 45
+    );
+    const doublon = photos.filter((p) => !p.analyses?.length);
+    const allSet = new Set(
+      [...flou, ...yeux, ...doublon].map((p) => p.id)
+    );
+    return {
+      all: allSet.size,
+      doublon: doublon.length,
+      yeux: yeux.length,
+      flou: flou.length,
+    };
+  }, [photosData]);
 
   // ── Tour ──────────────────────────────────────────────
   const { markSeen, load } = useTourStore();
@@ -441,7 +453,6 @@ export default function AnalyseImportScreen() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      <BottomTabBar activeRoute="/(tabs)/camera" />
       <AISelectionModal
         visible={showAIModal}
         onClose={() => setShowAIModal(false)}
@@ -449,6 +460,7 @@ export default function AnalyseImportScreen() {
           setShowAIModal(false);
           router.push(`/analyse/ai-selection?type=${type}`);
         }}
+        counts={anomalies}
       />
 
       {/* ── Guided Tour ── */}

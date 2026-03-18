@@ -23,17 +23,15 @@ import { profileApi } from "../../services/api/profile.api";
 import { messageApi, Conversation } from "../../services/api/message.api";
 import { usePhotos } from "../../hooks/usePhotos";
 import { Photo } from "../../services/api/photo.api";
+import { Story } from "../../services/api/story.api";
+import { useMyStories } from "../../hooks/useStories";
+import { StoryCreationModal } from "../../components/profile/StoryCreationModal";
+import { StoryViewer } from "../../components/profile/StoryViewer";
 
 const { width } = Dimensions.get("window");
 const PHOTO_SIZE = (width - 40 - 8) / 3;
 
-const STORIES = [
-  { id: "new", label: "Nouveau+", isAdd: true },
-  { id: "1", label: "Voyages" },
-  { id: "2", label: "Nature" },
-  { id: "3", label: "Urbain" },
-  { id: "4", label: "Portraits" },
-];
+type StoryItem = Story | { id: "new"; isAdd: true };
 
 // ─── Avatar helper (deterministic color from userId) ─────
 const AVATAR_COLORS = [
@@ -49,29 +47,47 @@ function getAvatarColor(id: string): string {
 }
 
 // ─── Story Circle ────────────────────────────────────────
-function StoryCircle({ story }: { story: (typeof STORIES)[0] }) {
+function StoryCircle({
+  story,
+  onPress,
+}: {
+  story: StoryItem;
+  onPress: () => void;
+}) {
+  const isAdd = "isAdd" in story;
+  const coverUrl = !isAdd ? (story as Story).coverUrl : null;
+  const label = isAdd ? "Nouveau+" : (story as Story).title;
+
   return (
-    <TouchableOpacity style={s.storyItem}>
+    <TouchableOpacity style={s.storyItem} onPress={onPress} activeOpacity={0.8}>
       <View style={s.storyRing}>
         <LinearGradient
-          colors={story.isAdd ? ["#606080", "#404060"] : (Gradients.brand as [string, string])}
+          colors={isAdd ? ["#606080", "#404060"] : (Gradients.brand as [string, string])}
           style={StyleSheet.absoluteFillObject}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         />
         <View style={s.storyInner}>
-          <LinearGradient
-            colors={story.isAdd ? [Colors.bgCard, Colors.bgDark] : ["#2D1060", "#1A1040"]}
-            style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
-          />
-          {story.isAdd && (
+          {coverUrl ? (
+            <Image
+              source={{ uri: coverUrl }}
+              style={{ width: "100%", height: "100%" }}
+              resizeMode="cover"
+            />
+          ) : (
+            <LinearGradient
+              colors={isAdd ? [Colors.bgCard, Colors.bgDark] : ["#2D1060", "#1A1040"]}
+              style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+            />
+          )}
+          {isAdd && (
             <View style={s.storyAddOverlay}>
               <Text style={s.storyAddIcon}>+</Text>
             </View>
           )}
         </View>
       </View>
-      <Text style={s.storyLabel} numberOfLines={1}>{story.label}</Text>
+      <Text style={s.storyLabel} numberOfLines={1}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -115,6 +131,10 @@ export default function ProfileScreen() {
   const router = useRouter();
   const authUser = useAuthStore((s) => s.user);
   const [activeTab, setActiveTab] = useState<"photos" | "amis">("photos");
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [viewerStory, setViewerStory] = useState<Story | null>(null);
+
+  const { data: myStories = [] } = useMyStories();
 
   const { data: profile } = useQuery({
     queryKey: ["profile", "me"],
@@ -299,8 +319,17 @@ export default function ProfileScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={s.storiesRow}
           >
-            {STORIES.map((story) => (
-              <StoryCircle key={story.id} story={story} />
+            {/* "Nouveau+" button always first */}
+            <StoryCircle
+              story={{ id: "new", isAdd: true }}
+              onPress={() => setShowCreateModal(true)}
+            />
+            {myStories.map((story) => (
+              <StoryCircle
+                key={story.id}
+                story={story}
+                onPress={() => setViewerStory(story)}
+              />
             ))}
           </ScrollView>
         </View>
@@ -412,6 +441,17 @@ export default function ProfileScreen() {
       </ScrollView>
 
       <BottomTabBar activeRoute="/(tabs)/profile" />
+
+      <StoryCreationModal
+        visible={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+      />
+
+      <StoryViewer
+        story={viewerStory}
+        visible={viewerStory !== null}
+        onClose={() => setViewerStory(null)}
+      />
     </View>
   );
 }

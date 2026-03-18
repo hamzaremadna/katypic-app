@@ -5,7 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
+  ActivityIndicator,
   Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -13,65 +13,33 @@ import { StatusBar } from "expo-status-bar";
 import { useLocalSearchParams } from "expo-router";
 import { navigate } from "@/utils/navigation";
 import { Colors, Gradients } from "../../theme/colors";
-import { KaytiHeader, BottomTabBar, ReviewModal } from "../../components/ui";
+import { KaytiHeader, ReviewModal } from "../../components/ui";
 import { Icon } from "../../components/ui/Icon";
+import { useEvent, useJoinEvent, useLeaveEvent } from "@/hooks/useEvents";
+import { EVENT_LEVEL_LABELS, EventLevel } from "@/services/api/event.api";
+import { useAuthStore } from "@/stores/authStore";
 
-const { width } = Dimensions.get("window");
-
-// ─── Mock Data ──────────────────────────────────────────
-const EVENT_DATA = {
-  id: "1",
-  title: "Golden hour au parc",
-  level: "Débutant",
-  levelColor: "#00C851",
-  date: "Dim 16 mars 18h30",
-  location: "Jardin du Luxembourg",
-  participantsCount: 5,
-  participantsMax: 10,
-  organizer: "Thomas L.",
-  rating: 4.7,
-  reviewCount: 3,
-  isPrivate: false, // toggle to true to see private variant
-  description:
-    "Rejoignez-nous pour une session photo pendant la golden hour au Jardin du Luxembourg. Nous explorerons les meilleures compositions avec la lumière dorée du coucher de soleil. Apportez votre appareil et votre créativité !",
-  participants: [
-    {
-      id: "1",
-      name: "Thomas L.",
-      isOrganizer: true,
-      bio: "Photographe passionné | Paysages & portraits",
-      avatarColor: "#7B2FBE",
-    },
-    {
-      id: "2",
-      name: "Marie D.",
-      isOrganizer: false,
-      bio: "Amateur de street photography",
-      avatarColor: "#E91E8C",
-    },
-    {
-      id: "3",
-      name: "Lucas B.",
-      isOrganizer: false,
-      bio: "Débutant enthousiaste",
-      avatarColor: "#4A90E2",
-    },
-    {
-      id: "4",
-      name: "Sophie T.",
-      isOrganizer: false,
-      bio: "Photographe nature & macro",
-      avatarColor: "#00C851",
-    },
-    {
-      id: "5",
-      name: "Antoine R.",
-      isOrganizer: false,
-      bio: "Portrait et mode",
-      avatarColor: "#FF8C00",
-    },
-  ],
+const LEVEL_COLORS: Record<EventLevel, string> = {
+  BEGINNER: "#00C851",
+  ALL_LEVELS: "#4A90E2",
+  INTERMEDIATE: "#FF8C00",
+  ADVANCED: "#E91E8C",
 };
+
+function formatDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString("fr-FR", {
+      weekday: "short",
+      day: "numeric",
+      month: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
 
 // ─── Info Row ────────────────────────────────────────────
 function InfoRow({ icon, text }: { icon: string; text: string }) {
@@ -89,41 +57,33 @@ function InfoRow({ icon, text }: { icon: string; text: string }) {
 function ParticipantCard({
   participant,
 }: {
-  participant: (typeof EVENT_DATA.participants)[0];
+  participant: { id: string; role: string; user: { id: string; username: string } };
 }) {
+  const isOrganizer = participant.role === "ORGANIZER";
+  const name = participant.user.username;
+  const avatarColors = ["#3D1B69", "#1A1040"] as [string, string];
+
   return (
     <View style={s.participantCard}>
       <View style={s.participantLeft}>
-        <View
-          style={[
-            s.participantAvatar,
-            { backgroundColor: participant.avatarColor },
-          ]}
-        >
-          <Text style={s.participantAvatarText}>{participant.name[0]}</Text>
-        </View>
+        <LinearGradient colors={avatarColors} style={s.participantAvatar}>
+          <Text style={s.participantAvatarText}>{name[0].toUpperCase()}</Text>
+        </LinearGradient>
         <View style={{ flex: 1 }}>
           <View style={s.participantNameRow}>
-            <Text style={s.participantName}>{participant.name}</Text>
-            {participant.isOrganizer && (
+            <Text style={s.participantName}>{name}</Text>
+            {isOrganizer && (
               <View style={s.orgBadge}>
                 <Text style={s.orgBadgeText}>ORG</Text>
               </View>
             )}
           </View>
-          <Text style={s.participantBio} numberOfLines={1}>
-            {participant.bio}
-          </Text>
         </View>
       </View>
-      {!participant.isOrganizer && (
+      {!isOrganizer && (
         <TouchableOpacity
           style={s.messageBtn}
-          onPress={() =>
-            navigate(
-              `/chat/${participant.id}?name=${encodeURIComponent(participant.name)}`
-            )
-          }
+          onPress={() => navigate(`/chat/${participant.user.id}?name=${encodeURIComponent(name)}`)}
         >
           <Icon name="message-circle" size={16} color={Colors.textPrimary} />
         </TouchableOpacity>
@@ -149,14 +109,9 @@ function PrivateEventOverlay({ onRequest }: { onRequest: () => void }) {
       </View>
       <Text style={s.privateTitle}>Événement privé</Text>
       <Text style={s.privateSub}>
-        Cet événement est sur invitation uniquement ou requiert une demande de
-        participation.
+        Cet événement est sur invitation uniquement ou requiert une demande de participation.
       </Text>
-      <TouchableOpacity
-        style={s.requestPrivateBtn}
-        onPress={onRequest}
-        activeOpacity={0.85}
-      >
+      <TouchableOpacity style={s.requestPrivateBtn} onPress={onRequest} activeOpacity={0.85}>
         <LinearGradient
           colors={["#E91E8C", "#7B2FBE"] as [string, string]}
           style={s.requestPrivateBtnGrad}
@@ -164,9 +119,7 @@ function PrivateEventOverlay({ onRequest }: { onRequest: () => void }) {
           end={{ x: 1, y: 0 }}
         >
           <Icon name="send" size={16} color="#fff" />
-          <Text style={s.requestPrivateBtnText}>
-            Faire une demande pour participer
-          </Text>
+          <Text style={s.requestPrivateBtnText}>Faire une demande pour participer</Text>
         </LinearGradient>
       </TouchableOpacity>
     </View>
@@ -175,61 +128,89 @@ function PrivateEventOverlay({ onRequest }: { onRequest: () => void }) {
 
 // ─── Main Screen ─────────────────────────────────────────
 export default function EventDetailScreen() {
-  const { eventId } = useLocalSearchParams();
+  const { eventId } = useLocalSearchParams<{ eventId: string }>();
   const [saved, setSaved] = useState(false);
   const [reviewVisible, setReviewVisible] = useState(false);
-  const event = EVENT_DATA;
 
-  const handleParticipate = () => {
-    navigate(
-      `/event/request?eventId=${event.id}&title=${encodeURIComponent(event.title)}`
+  const { data: event, isLoading } = useEvent(eventId ?? "");
+  const joinEvent = useJoinEvent();
+  const leaveEvent = useLeaveEvent();
+  const { user } = useAuthStore();
+
+  if (isLoading || !event) {
+    return (
+      <View style={[s.container, { alignItems: "center", justifyContent: "center" }]}>
+        <StatusBar style="light" />
+        <LinearGradient colors={["#0E0A24", "#080814"]} style={StyleSheet.absoluteFillObject} />
+        <KaytiHeader showBack title="Détail événement" />
+        <ActivityIndicator color={Colors.accentPurple} size="large" />
+      </View>
     );
+  }
+
+  const levelLabel = EVENT_LEVEL_LABELS[event.level] ?? "Tous niveaux";
+  const levelColor = LEVEL_COLORS[event.level] ?? "#4A90E2";
+  const memberCount = event._count?.members ?? event.members?.length ?? 0;
+  const isPrivate = !event.isPublic;
+  const isPast = event.status === "COMPLETED" || new Date(event.endsAt) < new Date();
+
+  const myMembership = event.members?.find((m) => m.user.id === user?.id);
+  const isMember = !!myMembership;
+  const isOrganizer = myMembership?.role === "ORGANIZER";
+
+  const handleJoin = async () => {
+    try {
+      await joinEvent.mutateAsync(event.id);
+    } catch {
+      Alert.alert("Erreur", "Impossible de rejoindre l'événement.");
+    }
+  };
+
+  const handleLeave = () => {
+    Alert.alert("Quitter l'événement", "Êtes-vous sûr ?", [
+      { text: "Annuler", style: "cancel" },
+      {
+        text: "Quitter",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await leaveEvent.mutateAsync(event.id);
+          } catch {
+            Alert.alert("Erreur", "Impossible de quitter l'événement.");
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleRequest = () => {
+    navigate(`/event/request?eventId=${event.id}&title=${encodeURIComponent(event.title)}&isPrivate=true`);
   };
 
   return (
     <View style={s.container}>
       <StatusBar style="light" />
-      <LinearGradient
-        colors={["#0E0A24", "#080814"]}
-        style={StyleSheet.absoluteFillObject}
-      />
+      <LinearGradient colors={["#0E0A24", "#080814"]} style={StyleSheet.absoluteFillObject} />
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={s.scroll}
-      >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
         <KaytiHeader showBack title="Détail événement" />
 
         {/* ── Cover Image ── */}
         <View style={s.coverWrapper}>
           <View style={s.coverImage}>
-            <LinearGradient
-              colors={["#3D1B69", "#1A1040"]}
-              style={StyleSheet.absoluteFillObject}
-            />
+            <LinearGradient colors={["#3D1B69", "#1A1040"]} style={StyleSheet.absoluteFillObject} />
             <LinearGradient
               colors={["transparent", "rgba(10,10,20,0.65)"]}
               style={StyleSheet.absoluteFillObject}
             />
-
-            {/* Private blur overlay */}
-            {event.isPrivate && (
+            {isPrivate && (
               <View style={s.coverPrivateBlur}>
                 <Icon name="lock" size={28} color="rgba(255,255,255,0.5)" />
               </View>
             )}
-
-            {/* Level badge + actions */}
             <View style={s.coverOverlay}>
-              <View
-                style={[
-                  s.levelBadge,
-                  { borderColor: event.levelColor + "80" },
-                ]}
-              >
-                <Text style={[s.levelBadgeText, { color: event.levelColor }]}>
-                  {event.level}
-                </Text>
+              <View style={[s.levelBadge, { borderColor: levelColor + "80" }]}>
+                <Text style={[s.levelBadgeText, { color: levelColor }]}>{levelLabel}</Text>
               </View>
               <View style={s.coverActions}>
                 <TouchableOpacity style={s.coverActionBtn}>
@@ -239,11 +220,7 @@ export default function EventDetailScreen() {
                   style={[s.coverActionBtn, saved && s.coverActionBtnActive]}
                   onPress={() => setSaved(!saved)}
                 >
-                  <Icon
-                    name="heart"
-                    size={18}
-                    color={saved ? "#E91E8C" : Colors.textPrimary}
-                  />
+                  <Icon name="heart" size={18} color={saved ? "#E91E8C" : Colors.textPrimary} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -258,61 +235,48 @@ export default function EventDetailScreen() {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           />
-
           <Text style={s.eventTitle}>{event.title}</Text>
 
           <View style={s.infoRows}>
-            <InfoRow icon="calendar" text={event.date} />
-            <InfoRow icon="marker-pin" text={event.location} />
+            <InfoRow icon="calendar" text={formatDate(event.startsAt)} />
+            {event.address ? <InfoRow icon="marker-pin" text={event.address} /> : null}
             <InfoRow
               icon="users"
-              text={`${event.participantsCount}/${event.participantsMax} participants`}
+              text={`${memberCount}${event.maxParticipants ? `/${event.maxParticipants}` : ""} participants`}
             />
-            <InfoRow icon="user" text={`Organisé par ${event.organizer}`} />
-            <TouchableOpacity
-              style={s.infoRow}
-              onPress={() => setReviewVisible(true)}
-              activeOpacity={0.7}
-            >
-              <View style={{ width: 24, alignItems: "center" }}>
-                <Icon name="star" size={16} color="#FFD700" />
-              </View>
-              <Text style={s.infoText}>
-                {event.rating} ({event.reviewCount} avis)
-              </Text>
-              <Text style={s.reviewLink}>Laisser un avis</Text>
-            </TouchableOpacity>
+            <InfoRow icon="user" text={`Organisé par ${event.createdBy.username}`} />
           </View>
 
-          {/* About */}
-          <View style={s.aboutSection}>
-            <Text style={s.aboutTitle}>À propos</Text>
-            <Text style={s.aboutText}>{event.description}</Text>
-          </View>
+          {event.description ? (
+            <View style={s.aboutSection}>
+              <Text style={s.aboutTitle}>À propos</Text>
+              <Text style={s.aboutText}>{event.description}</Text>
+            </View>
+          ) : null}
 
-          {/* Participer button */}
-          {!event.isPrivate ? (
+          {/* Action button */}
+          {isPast ? (
             <TouchableOpacity
               style={s.participateBtn}
-              onPress={handleParticipate}
+              onPress={() => setReviewVisible(true)}
               activeOpacity={0.85}
             >
               <LinearGradient
-                colors={["#E91E8C", "#7B2FBE"] as [string, string]}
+                colors={["#7B2FBE", "#4A1B8E"] as [string, string]}
                 style={s.participateBtnGrad}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
-                <Icon name="users" size={18} color="#fff" />
-                <Text style={s.participateBtnText}>Participer</Text>
+                <Icon name="star" size={18} color="#fff" />
+                <Text style={s.participateBtnText}>Laisser un avis</Text>
               </LinearGradient>
             </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={s.participateBtn}
-              onPress={handleParticipate}
-              activeOpacity={0.85}
-            >
+          ) : isOrganizer ? null : isMember ? (
+            <TouchableOpacity style={s.leaveBtn} onPress={handleLeave} activeOpacity={0.85}>
+              <Text style={s.leaveBtnText}>Quitter l'événement</Text>
+            </TouchableOpacity>
+          ) : isPrivate ? (
+            <TouchableOpacity style={s.participateBtn} onPress={handleRequest} activeOpacity={0.85}>
               <LinearGradient
                 colors={["#E91E8C", "#7B2FBE"] as [string, string]}
                 style={s.participateBtnGrad}
@@ -320,77 +284,79 @@ export default function EventDetailScreen() {
                 end={{ x: 1, y: 0 }}
               >
                 <Icon name="send" size={18} color="#fff" />
-                <Text style={s.participateBtnText}>
-                  Faire une demande pour participer
-                </Text>
+                <Text style={s.participateBtnText}>Faire une demande pour participer</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={s.participateBtn}
+              onPress={handleJoin}
+              disabled={joinEvent.isPending}
+              activeOpacity={0.85}
+            >
+              <LinearGradient
+                colors={["#E91E8C", "#7B2FBE"] as [string, string]}
+                style={s.participateBtnGrad}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                {joinEvent.isPending ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Icon name="users" size={18} color="#fff" />
+                    <Text style={s.participateBtnText}>Participer</Text>
+                  </>
+                )}
               </LinearGradient>
             </TouchableOpacity>
           )}
         </View>
 
         {/* ── Participants section ── */}
-        {!event.isPrivate ? (
+        {event.members && event.members.length > 0 && (
           <View style={s.section}>
-            <Text style={s.sectionTitle}>
-              Participants ({event.participantsCount})
-            </Text>
-            <View style={s.participantsList}>
-              {event.participants.map((participant) => (
-                <ParticipantCard
-                  key={participant.id}
-                  participant={participant}
+            <Text style={s.sectionTitle}>Participants ({memberCount})</Text>
+            {!isPrivate || isMember ? (
+              <View style={s.participantsList}>
+                {event.members.map((m) => (
+                  <ParticipantCard key={m.id} participant={m} />
+                ))}
+              </View>
+            ) : (
+              <View style={s.privateParticipants}>
+                <LinearGradient
+                  colors={["rgba(8,8,20,0.0)", "rgba(8,8,20,0.98)"]}
+                  style={s.privateParticipantsGrad}
                 />
-              ))}
-            </View>
-          </View>
-        ) : (
-          /* Private event participants locked */
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>
-              Participants ({event.participantsCount})
-            </Text>
-            <View style={s.privateParticipants}>
-              <LinearGradient
-                colors={["rgba(8,8,20,0.0)", "rgba(8,8,20,0.98)"]}
-                style={s.privateParticipantsGrad}
-              />
-              {/* Show first 2 blurred */}
-              {event.participants.slice(0, 2).map((p) => (
-                <View key={p.id} style={[s.participantCard, { opacity: 0.3 }]}>
-                  <View style={s.participantLeft}>
-                    <View
-                      style={[
-                        s.participantAvatar,
-                        { backgroundColor: p.avatarColor },
-                      ]}
-                    >
-                      <Text style={s.participantAvatarText}>{p.name[0]}</Text>
-                    </View>
-                    <View>
-                      <Text style={s.participantName}>{p.name}</Text>
-                      <Text style={s.participantBio}>{p.bio}</Text>
+                {event.members.slice(0, 2).map((m) => (
+                  <View key={m.id} style={[s.participantCard, { opacity: 0.3 }]}>
+                    <View style={s.participantLeft}>
+                      <LinearGradient colors={["#3D1B69", "#1A1040"]} style={s.participantAvatar}>
+                        <Text style={s.participantAvatarText}>
+                          {m.user.username[0].toUpperCase()}
+                        </Text>
+                      </LinearGradient>
+                      <Text style={s.participantName}>{m.user.username}</Text>
                     </View>
                   </View>
-                </View>
-              ))}
-              {/* Lock overlay */}
-              <PrivateEventOverlay onRequest={handleParticipate} />
-            </View>
+                ))}
+                <PrivateEventOverlay onRequest={handleRequest} />
+              </View>
+            )}
           </View>
         )}
 
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      <BottomTabBar activeRoute="/(tabs)/discover" />
-
       <ReviewModal
         visible={reviewVisible}
         spotName={event.title}
         onClose={() => setReviewVisible(false)}
-        onSubmit={(rating, comment) => {
+        onSubmit={(_rating, _comment) => {
           setReviewVisible(false);
-          Alert.alert("Merci !", `Votre avis (${rating}★) a été envoyé.`);
+          Alert.alert("Merci !", "Votre avis a été enregistré.");
         }}
       />
     </View>
@@ -402,7 +368,6 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bgDeep },
   scroll: { paddingBottom: 20 },
 
-  // Cover
   coverWrapper: { paddingHorizontal: 20, marginTop: 8 },
   coverImage: {
     width: "100%",
@@ -431,14 +396,8 @@ const s = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.5)",
     borderWidth: 1,
   },
-  levelBadgeText: {
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  coverActions: {
-    flexDirection: "row",
-    gap: 10,
-  },
+  levelBadgeText: { fontSize: 12, fontWeight: "800" },
+  coverActions: { flexDirection: "row", gap: 10 },
   coverActionBtn: {
     width: 40,
     height: 40,
@@ -447,11 +406,8 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  coverActionBtnActive: {
-    backgroundColor: "rgba(233,30,140,0.2)",
-  },
+  coverActionBtnActive: { backgroundColor: "rgba(233,30,140,0.2)" },
 
-  // Info Card
   infoCard: {
     marginHorizontal: 20,
     marginTop: 16,
@@ -468,24 +424,9 @@ const s = StyleSheet.create({
     marginBottom: 16,
   },
   infoRows: { gap: 12 },
-  infoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  infoText: {
-    fontSize: 15,
-    color: Colors.textSecondary,
-    fontWeight: "500",
-    flex: 1,
-  },
-  reviewLink: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: Colors.accentPurple,
-  },
+  infoRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  infoText: { fontSize: 15, color: Colors.textSecondary, fontWeight: "500", flex: 1 },
 
-  // About
   aboutSection: {
     marginTop: 20,
     paddingTop: 16,
@@ -493,18 +434,9 @@ const s = StyleSheet.create({
     borderTopColor: Colors.divider,
     gap: 8,
   },
-  aboutTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: Colors.textPrimary,
-  },
-  aboutText: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    lineHeight: 22,
-  },
+  aboutTitle: { fontSize: 16, fontWeight: "700", color: Colors.textPrimary },
+  aboutText: { fontSize: 14, color: Colors.textSecondary, lineHeight: 22 },
 
-  // Participer button
   participateBtn: {
     marginTop: 20,
     borderRadius: 14,
@@ -522,26 +454,21 @@ const s = StyleSheet.create({
     gap: 8,
     paddingVertical: 16,
   },
-  participateBtnText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#fff",
-    letterSpacing: 0.3,
+  participateBtnText: { fontSize: 16, fontWeight: "700", color: "#fff", letterSpacing: 0.3 },
+  leaveBtn: {
+    marginTop: 20,
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
   },
+  leaveBtnText: { fontSize: 15, fontWeight: "600", color: Colors.textMuted },
 
-  // Section
-  section: {
-    marginTop: 24,
-    paddingHorizontal: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: Colors.textPrimary,
-    marginBottom: 14,
-  },
+  section: { marginTop: 24, paddingHorizontal: 20 },
+  sectionTitle: { fontSize: 18, fontWeight: "800", color: Colors.textPrimary, marginBottom: 14 },
 
-  // Participants
   participantsList: { gap: 10 },
   participantCard: {
     flexDirection: "row",
@@ -553,12 +480,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.cardBorder,
   },
-  participantLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    flex: 1,
-  },
+  participantLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
   participantAvatar: {
     width: 44,
     height: 44,
@@ -566,21 +488,9 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  participantAvatarText: {
-    color: Colors.textPrimary,
-    fontSize: 17,
-    fontWeight: "800",
-  },
-  participantNameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  participantName: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: Colors.textPrimary,
-  },
+  participantAvatarText: { color: Colors.textPrimary, fontSize: 17, fontWeight: "800" },
+  participantNameRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  participantName: { fontSize: 15, fontWeight: "700", color: Colors.textPrimary },
   orgBadge: {
     backgroundColor: "rgba(123,47,190,0.3)",
     paddingHorizontal: 8,
@@ -589,17 +499,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(123,47,190,0.5)",
   },
-  orgBadgeText: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: Colors.accentPurple,
-    letterSpacing: 0.5,
-  },
-  participantBio: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginTop: 2,
-  },
+  orgBadgeText: { fontSize: 10, fontWeight: "800", color: Colors.accentPurple, letterSpacing: 0.5 },
   messageBtn: {
     width: 40,
     height: 40,
@@ -611,12 +511,7 @@ const s = StyleSheet.create({
     borderColor: Colors.cardBorder,
   },
 
-  // Private participants
-  privateParticipants: {
-    gap: 10,
-    position: "relative",
-    minHeight: 160,
-  },
+  privateParticipants: { gap: 10, position: "relative", minHeight: 160 },
   privateParticipantsGrad: {
     position: "absolute",
     bottom: 0,
@@ -626,7 +521,6 @@ const s = StyleSheet.create({
     zIndex: 1,
   },
 
-  // Private overlay
   privateOverlay: {
     borderRadius: 20,
     padding: 28,
@@ -648,12 +542,7 @@ const s = StyleSheet.create({
     borderColor: "rgba(93,36,167,0.35)",
     marginBottom: 4,
   },
-  privateTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: Colors.textPrimary,
-    textAlign: "center",
-  },
+  privateTitle: { fontSize: 20, fontWeight: "800", color: Colors.textPrimary, textAlign: "center" },
   privateSub: {
     fontSize: 14,
     color: Colors.textMuted,
@@ -679,9 +568,5 @@ const s = StyleSheet.create({
     gap: 8,
     paddingVertical: 15,
   },
-  requestPrivateBtnText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#fff",
-  },
+  requestPrivateBtnText: { fontSize: 14, fontWeight: "700", color: "#fff" },
 });

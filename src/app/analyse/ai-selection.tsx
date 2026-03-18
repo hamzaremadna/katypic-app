@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -9,96 +9,54 @@ import {
   Dimensions,
   Platform,
   Alert,
+  Image,
+  ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Colors, Gradients } from "../../theme/colors";
-import { BottomTabBar } from "../../components/ui";
 import { Icon } from "../../components/ui/Icon";
+import { usePhotos, useDeletePhoto } from "../../hooks/usePhotos";
+import { Photo } from "../../services/api/photo.api";
 
 const { width } = Dimensions.get("window");
-
 const CELL_SIZE = (width - 56) / 2;
 
-interface Photo {
-  id: string;
-  colors: readonly [string, string];
-  tag: string | null;
-  tagType: "doublon" | "yeux" | null;
-  selected: boolean;
+// ── Anomaly helpers ──────────────────────────────────────────────────────────
+function isFlou(p: Photo): boolean {
+  return (p.analyses?.[0]?.technicalScore ?? 100) < 50;
+}
+function isYeux(p: Photo): boolean {
+  return (p.analyses?.[0]?.compositionScore ?? 100) < 45;
+}
+function isDoublon(p: Photo): boolean {
+  return !p.analyses?.length;
+}
+function getTag(
+  p: Photo
+): { label: string; type: "doublon" | "yeux" | "flou" } | null {
+  if (isDoublon(p)) return { label: "Doublon", type: "doublon" };
+  if (isFlou(p)) return { label: "Flou", type: "flou" };
+  if (isYeux(p)) return { label: "Yeux", type: "yeux" };
+  return null;
 }
 
-const MOCK_PHOTOS: Photo[] = [
-  {
-    id: "1",
-    colors: ["#5A8B3A", "#2A5A1A"],
-    tag: null,
-    tagType: null,
-    selected: false,
-  },
-  {
-    id: "2",
-    colors: ["#8B8B5A", "#5A5A2A"],
-    tag: null,
-    tagType: null,
-    selected: false,
-  },
-  {
-    id: "3",
-    colors: ["#3A5A8B", "#1A2A5A"],
-    tag: null,
-    tagType: null,
-    selected: false,
-  },
-  {
-    id: "4",
-    colors: ["#5A3A8B", "#2A1A5A"],
-    tag: "Doublon",
-    tagType: "doublon",
-    selected: false,
-  },
-  {
-    id: "5",
-    colors: ["#2A5A3A", "#1A3A2A"],
-    tag: null,
-    tagType: null,
-    selected: false,
-  },
-  {
-    id: "6",
-    colors: ["#8B5A3A", "#5A2A1A"],
-    tag: null,
-    tagType: null,
-    selected: false,
-  },
-  {
-    id: "7",
-    colors: ["#3A8B5A", "#1A5A2A"],
-    tag: null,
-    tagType: null,
-    selected: false,
-  },
-  {
-    id: "8",
-    colors: ["#5A3A5A", "#2A1A2A"],
-    tag: "Doublon",
-    tagType: "doublon",
-    selected: false,
-  },
-];
-
+// ── PhotoCell ────────────────────────────────────────────────────────────────
 function PhotoCell({
   photo,
+  selected,
   onToggle,
   index,
 }: {
   photo: Photo;
+  selected: boolean;
   onToggle: (id: string) => void;
   index: number;
 }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.92)).current;
+  const tag = getTag(photo);
 
   useEffect(() => {
     Animated.parallel([
@@ -123,17 +81,18 @@ function PhotoCell({
       style={{ opacity: fadeAnim, transform: [{ scale: scaleAnim }] }}
     >
       <TouchableOpacity
-        style={[pc.cell, photo.selected && pc.cellSelected]}
+        style={[pc.cell, selected && pc.cellSelected]}
         onPress={() => onToggle(photo.id)}
         activeOpacity={0.85}
       >
-        <LinearGradient
-          colors={photo.colors}
+        <Image
+          source={{ uri: photo.url }}
           style={StyleSheet.absoluteFillObject}
+          resizeMode="cover"
         />
 
         {/* Selection overlay */}
-        {photo.selected && (
+        {selected && (
           <View style={pc.selectedOverlay}>
             <LinearGradient
               colors={["rgba(233,30,140,0.3)", "rgba(123,47,190,0.2)"]}
@@ -143,16 +102,16 @@ function PhotoCell({
         )}
 
         {/* Tag badge */}
-        {photo.tag && (
-          <View style={[pc.tag, photo.tagType === "doublon" && pc.tagDoublon]}>
+        {tag && (
+          <View style={[pc.tag, tag.type === "doublon" && pc.tagDoublon]}>
             <Text style={pc.tagIcon}>
-              {photo.tagType === "doublon" ? "⧉" : "◉"}
+              {tag.type === "doublon" ? "⧉" : tag.type === "flou" ? "◎" : "◉"}
             </Text>
-            <Text style={pc.tagText}>{photo.tag}</Text>
+            <Text style={pc.tagText}>{tag.label}</Text>
           </View>
         )}
 
-        {/* Upload/bookmark button */}
+        {/* Analyse button */}
         <TouchableOpacity style={pc.bookmark}>
           <LinearGradient
             colors={Gradients.purpleBlue}
@@ -163,7 +122,7 @@ function PhotoCell({
         </TouchableOpacity>
 
         {/* Selected checkmark */}
-        {photo.selected && (
+        {selected && (
           <View style={pc.checkmark}>
             <LinearGradient
               colors={Gradients.brand}
@@ -219,7 +178,6 @@ const pc = StyleSheet.create({
     zIndex: 3,
   },
   bookmarkGradient: { flex: 1, alignItems: "center", justifyContent: "center" },
-  bookmarkIcon: { color: "#fff", fontSize: 12 },
   checkmark: {
     position: "absolute",
     bottom: 8,
@@ -235,19 +193,40 @@ const pc = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  checkmarkIcon: { color: "#fff", fontSize: 12, fontWeight: "800" },
 });
 
+// ── Screen ───────────────────────────────────────────────────────────────────
 export default function AISelectionScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ type: string }>();
-  const [photos, setPhotos] = useState<Photo[]>(MOCK_PHOTOS);
+  const { data: photosData, isLoading } = usePhotos();
+  const deletePhoto = useDeletePhoto();
 
-  const selectedPhotos = photos.filter((p) => p.selected);
-  const selectedCount = selectedPhotos.length;
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const headerFade = useRef(new Animated.Value(0)).current;
   const actionBarSlide = useRef(new Animated.Value(-80)).current;
+
+  // Filter photos based on the anomaly type requested
+  const filteredPhotos = useMemo(() => {
+    const photos = photosData?.photos ?? [];
+    const type = params.type;
+    if (type === "flou") return photos.filter(isFlou);
+    if (type === "yeux") return photos.filter(isYeux);
+    if (type === "doublon") return photos.filter(isDoublon);
+    // "all" → union of every anomaly type
+    return photos.filter((p) => isFlou(p) || isYeux(p) || isDoublon(p));
+  }, [photosData, params.type]);
+
+  // Pre-select all matching photos once data arrives
+  useEffect(() => {
+    if (filteredPhotos.length > 0) {
+      setSelectedIds(new Set(filteredPhotos.map((p) => p.id)));
+    }
+  }, [filteredPhotos.length]);
+
+  const selectedCount = selectedIds.size;
 
   useEffect(() => {
     Animated.timing(headerFade, {
@@ -267,9 +246,15 @@ export default function AISelectionScreen() {
   }, [selectedCount]);
 
   const togglePhoto = (id: string) => {
-    setPhotos((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, selected: !p.selected } : p))
-    );
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
   };
 
   const handleDelete = () => {
@@ -281,14 +266,24 @@ export default function AISelectionScreen() {
         {
           text: "Supprimer",
           style: "destructive",
-          onPress: () => setPhotos((prev) => prev.filter((p) => !p.selected)),
+          onPress: async () => {
+            setIsDeleting(true);
+            try {
+              for (const id of selectedIds) {
+                await deletePhoto.mutateAsync(id);
+              }
+              router.back();
+            } finally {
+              setIsDeleting(false);
+            }
+          },
         },
       ]
     );
   };
 
   const handleCancel = () => {
-    setPhotos((prev) => prev.map((p) => ({ ...p, selected: false })));
+    setSelectedIds(new Set());
   };
 
   return (
@@ -305,12 +300,10 @@ export default function AISelectionScreen() {
           <Icon name="arrow-left" size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Sélection IA</Text>
-        <TouchableOpacity style={s.settingsBtn}>
-          <Icon name="settings" size={18} color={Colors.textPrimary} />
-        </TouchableOpacity>
+        <View style={s.settingsBtn} />
       </Animated.View>
 
-      {/* Action bar (appears when items selected) */}
+      {/* Action bar (slides in when photos are selected) */}
       <Animated.View
         style={[s.actionBar, { transform: [{ translateY: actionBarSlide }] }]}
       >
@@ -319,15 +312,27 @@ export default function AISelectionScreen() {
           {selectedCount} photo(s){"\n"}sélectionnée(s)
         </Text>
         <View style={s.actionBarBtns}>
-          <TouchableOpacity style={s.deleteBtn} onPress={handleDelete}>
+          <TouchableOpacity
+            style={s.deleteBtn}
+            onPress={handleDelete}
+            disabled={isDeleting}
+          >
             <LinearGradient
               colors={Gradients.redPink}
               style={s.deleteBtnGradient}
             >
-              <Text style={s.deleteBtnText}>Supprimer</Text>
+              {isDeleting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={s.deleteBtnText}>Supprimer</Text>
+              )}
             </LinearGradient>
           </TouchableOpacity>
-          <TouchableOpacity style={s.cancelBtn} onPress={handleCancel}>
+          <TouchableOpacity
+            style={s.cancelBtn}
+            onPress={handleCancel}
+            disabled={isDeleting}
+          >
             <View style={s.cancelBtnInner}>
               <Text style={s.cancelBtnText}>Annuler</Text>
             </View>
@@ -339,20 +344,35 @@ export default function AISelectionScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scroll}
       >
-        <View style={s.photoGrid}>
-          {photos.map((photo, i) => (
-            <PhotoCell
-              key={photo.id}
-              photo={photo}
-              onToggle={togglePhoto}
-              index={i}
-            />
-          ))}
-        </View>
+        {isLoading ? (
+          <ActivityIndicator
+            color={Colors.accentPink}
+            style={{ marginTop: 40 }}
+          />
+        ) : filteredPhotos.length === 0 ? (
+          <View style={s.empty}>
+            <Icon name="sparkles" size={36} color={Colors.textMuted} />
+            <Text style={s.emptyText}>Aucune anomalie détectée 🎉</Text>
+            <Text style={s.emptySubtext}>
+              Toutes tes photos ont l'air en bonne forme !
+            </Text>
+          </View>
+        ) : (
+          <View style={s.photoGrid}>
+            {filteredPhotos.map((photo, i) => (
+              <PhotoCell
+                key={photo.id}
+                photo={photo}
+                selected={selectedIds.has(photo.id)}
+                onToggle={togglePhoto}
+                index={i}
+              />
+            ))}
+          </View>
+        )}
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      <BottomTabBar activeRoute="/(tabs)/camera" />
     </View>
   );
 }
@@ -369,7 +389,6 @@ const s = StyleSheet.create({
     paddingBottom: 12,
   },
   backBtn: { width: 36, height: 36, justifyContent: "center" },
-  backIcon: { color: Colors.textPrimary, fontSize: 22 },
   headerTitle: {
     fontSize: 17,
     fontWeight: "700",
@@ -377,13 +396,7 @@ const s = StyleSheet.create({
     flex: 1,
     textAlign: "center",
   },
-  settingsBtn: {
-    width: 36,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  settingsIcon: { fontSize: 18 },
+  settingsBtn: { width: 36, height: 36 },
 
   // Action bar
   actionBar: {
@@ -405,7 +418,13 @@ const s = StyleSheet.create({
   },
   actionBarBtns: { flexDirection: "row", gap: 10 },
   deleteBtn: { borderRadius: 20, overflow: "hidden" },
-  deleteBtnGradient: { paddingVertical: 8, paddingHorizontal: 16 },
+  deleteBtnGradient: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    minWidth: 90,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   deleteBtnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
   cancelBtn: { borderRadius: 20, overflow: "hidden" },
   cancelBtnInner: {
@@ -424,5 +443,22 @@ const s = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
+  },
+
+  // Empty state
+  empty: {
+    alignItems: "center",
+    paddingTop: 60,
+    gap: 10,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: Colors.textPrimary,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: Colors.textMuted,
+    textAlign: "center",
   },
 });

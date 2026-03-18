@@ -1,5 +1,7 @@
 import { api } from "./client";
 
+export type EventLevel = "BEGINNER" | "ALL_LEVELS" | "INTERMEDIATE" | "ADVANCED";
+
 export interface Event {
   id: string;
   title: string;
@@ -12,8 +14,10 @@ export interface Event {
   maxParticipants?: number;
   coverImageUrl?: string;
   isPublic: boolean;
+  level: EventLevel;
   status: "UPCOMING" | "ONGOING" | "COMPLETED" | "CANCELLED";
   createdBy: { id: string; username: string };
+  members?: EventMember[];
   spot?: { id: string; name: string };
   _count?: { members: number };
 }
@@ -24,11 +28,35 @@ export interface EventMember {
   user: { id: string; username: string };
 }
 
+export interface EventJoinRequest {
+  id: string;
+  eventId: string;
+  userId: string;
+  message: string;
+  portfolioUrl?: string;
+  status: "PENDING" | "ACCEPTED" | "DECLINED";
+  createdAt: string;
+  event: Event;
+}
+
+export const EVENT_LEVEL_LABELS: Record<EventLevel, string> = {
+  BEGINNER: "Débutant",
+  ALL_LEVELS: "Tous niveaux",
+  INTERMEDIATE: "Intermédiaire",
+  ADVANCED: "Avancé",
+};
+
 export const eventApi = {
   listByLocation: (lat: number, lng: number, radius = 10) =>
     api.get<Event[]>(`/events?lat=${lat}&lng=${lng}&radius=${radius}`),
 
   get: (eventId: string) => api.get<Event>(`/events/${eventId}`),
+
+  getMyEvents: () => api.get<{ upcoming: Event[]; past: Event[] }>("/events/me"),
+
+  getCreatedEvents: () => api.get<Event[]>("/events/created"),
+
+  getPendingRequests: () => api.get<EventJoinRequest[]>("/events/pending"),
 
   create: (data: {
     title: string;
@@ -41,9 +69,14 @@ export const eventApi = {
     maxParticipants?: number;
     spotId?: string;
     coverImageUrl?: string;
+    level?: EventLevel;
+    isPublic?: boolean;
   }) => api.post<Event>("/events", data),
 
   join: (eventId: string) => api.post(`/events/${eventId}/join`),
 
   leave: (eventId: string) => api.post(`/events/${eventId}/leave`),
+
+  requestJoin: (eventId: string, data: { message: string; portfolioUrl?: string }) =>
+    api.post<EventJoinRequest>(`/events/${eventId}/request`, data),
 };

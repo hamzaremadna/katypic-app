@@ -6,8 +6,8 @@ export const authApi = {
   login: (email: string, password: string) =>
     apiClient.post<AuthResponse>("/auth/login", { email, password }),
 
-  register: (email: string, username: string, password: string) =>
-    apiClient.post<AuthResponse>("/auth/register", { email, username, password }),
+  register: (email: string, username: string, password: string, displayName?: string) =>
+    apiClient.post<AuthResponse>("/auth/register", { email, username, password, displayName }),
 
   googleOAuth: (idToken: string) =>
     apiClient.post<AuthResponse>("/auth/google", { idToken }),

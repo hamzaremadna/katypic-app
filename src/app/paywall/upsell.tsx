@@ -14,6 +14,7 @@ import { Colors, Gradients } from "../../theme/colors";
 import { Fonts } from "../../theme/typography";
 import { Icon, IconName } from "../../components/ui/Icon";
 import { Mascot } from "../../components/ui/Mascot";
+import { hapticLight, hapticHeavy } from "../../utils/haptics";
 
 const PW_START = { x: 0.2, y: 0.1 };
 const PW_END = { x: 0.8, y: 0.9 };
@@ -75,12 +76,14 @@ export default function UpsellScreen() {
   const { billing } = useLocalSearchParams<{ plan: string; billing: string }>();
 
   const handleUpgrade = () => {
+    hapticHeavy(); // strongest CTA in the app
     navigate(
       `/paywall/confirmation?plan=pro&billing=${billing ?? "yearly"}`
     );
   };
 
   const handleSkip = () => {
+    hapticLight();
     navigate(
       `/paywall/confirmation?plan=premium&billing=${billing ?? "yearly"}`
     );

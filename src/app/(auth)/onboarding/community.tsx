@@ -220,8 +220,10 @@ export default function CommunityScreen() {
             "Partagez & apprenez ensemble",
           ]}
         />
+      </ScrollView>
 
-        {/* CTA */}
+      {/* Button pinned at bottom */}
+      <View style={s.ctaContainer}>
         <GradientButton
           label="Suivant"
           onPress={() =>
@@ -230,16 +232,20 @@ export default function CommunityScreen() {
               params: { step: "3", answers: params.answers },
             })
           }
-          style={s.cta}
         />
-      </ScrollView>
+      </View>
     </View>
   );
 }
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bgDeep },
-  scroll: { paddingBottom: 50, gap: 20 },
+  scroll: { paddingBottom: 16, gap: 20 },
+  ctaContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === "ios" ? 34 : 20,
+    paddingTop: 12,
+  },
 
   hero: { paddingHorizontal: 20 },
   heroTitle: {

@@ -451,21 +451,27 @@ export default function ProgressScreen() {
         {QUEST_PATHS.map((path, i) => (
           <QuestPathCard key={path.tag} path={path} delay={500 + i * 150} />
         ))}
+      </ScrollView>
 
-        {/* CTA */}
+      {/* Button pinned at bottom */}
+      <View style={s.ctaContainer}>
         <GradientButton
           label="Suivant"
           onPress={() => router.push({ pathname: "/(auth)/onboarding/congrats", params })}
-          style={s.cta}
         />
-      </ScrollView>
+      </View>
     </View>
   );
 }
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bgDeep },
-  scroll: { paddingBottom: 40, gap: 8 },
+  scroll: { paddingBottom: 16, gap: 8 },
+  ctaContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === "ios" ? 34 : 20,
+    paddingTop: 12,
+  },
   bgGlow: { position: "absolute", top: 0, left: 0, right: 0, height: 250 },
   hero: { paddingHorizontal: 20 },
   heroIcon: { fontSize: 16, color: Colors.textPrimary },
@@ -495,5 +501,4 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     textAlign: "center",
   },
-  cta: { marginHorizontal: 20 },
 });

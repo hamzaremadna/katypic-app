@@ -22,6 +22,7 @@ import {
   usePhotoAnalysis,
   useAnalyzePhoto,
 } from "../../hooks/usePhotoAnalysis";
+import { hapticMedium, hapticSuccess, hapticError } from "../../utils/haptics";
 import { useUploadPhoto } from "../../hooks/useUploadPhoto";
 
 const { width } = Dimensions.get("window");
@@ -354,12 +355,14 @@ export default function AnalyseResultScreen() {
         });
 
         setPipelineStep("done");
+        hapticSuccess(); // analysis complete — triple beat
       } catch (err) {
         console.warn("Pipeline error:", err);
         const msg =
           err instanceof Error ? err.message : "Erreur inconnue";
         setErrorMessage(msg);
         setPipelineStep("error");
+        hapticError();
       }
     })();
   }, []);

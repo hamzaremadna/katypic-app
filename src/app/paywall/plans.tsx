@@ -15,6 +15,7 @@ import { Colors, Gradients } from "../../theme/colors";
 import { Fonts } from "../../theme/typography";
 import { Icon, IconName } from "../../components/ui/Icon";
 import { Mascot } from "../../components/ui/Mascot";
+import { hapticLight, hapticHeavy } from "../../utils/haptics";
 import MaskedView from "@react-native-masked-view/masked-view";
 
 // ─── Paywall gradient ────────────────────────────────────────────────────────
@@ -215,9 +216,11 @@ export default function PlansScreen() {
 
   const handleSelect = (planId: PlanId) => {
     if (planId === "free") {
+      hapticLight();
       router.back();
       return;
     }
+    hapticHeavy(); // high-intent plan selection
     if (planId === "premium") {
       navigate(
         `/paywall/upsell?plan=premium&billing=${
@@ -270,7 +273,7 @@ export default function PlansScreen() {
           <View style={s.toggleWrap}>
             <TouchableOpacity
               style={[s.toggleBtn, isYearly && s.toggleBtnActive]}
-              onPress={() => setIsYearly(true)}
+              onPress={() => { hapticLight(); setIsYearly(true); }}
             >
               {isYearly && (
                 <LinearGradient
@@ -286,7 +289,7 @@ export default function PlansScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[s.toggleBtn, !isYearly && s.toggleBtnActive]}
-              onPress={() => setIsYearly(false)}
+              onPress={() => { hapticLight(); setIsYearly(false); }}
             >
               {!isYearly && (
                 <LinearGradient

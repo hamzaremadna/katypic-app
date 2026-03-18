@@ -8,6 +8,8 @@ import {
   TextInput,
   Platform,
   KeyboardAvoidingView,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
@@ -15,6 +17,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { navigateReplace } from "@/utils/navigation";
 import { Colors, Gradients } from "../../theme/colors";
 import { Icon } from "../../components/ui/Icon";
+import { useRequestJoin } from "@/hooks/useEvents";
 
 const LEVEL_OPTIONS = [
   { id: "beginner", label: "Débutant" },
@@ -28,18 +31,19 @@ type LevelId = (typeof LEVEL_OPTIONS)[number]["id"];
 function RequestForm({
   eventTitle,
   onSubmit,
+  isSubmitting,
   onCancel,
 }: {
   eventTitle: string;
-  onSubmit: () => void;
+  onSubmit: (message: string, portfolioUrl?: string) => void;
+  isSubmitting: boolean;
   onCancel: () => void;
 }) {
   const [message, setMessage] = useState("");
   const [level, setLevel] = useState<LevelId>("beginner");
   const [portfolio, setPortfolio] = useState("");
-  const specialties = ["Portrait", "Paysage", "Architecture"];
 
-  const canSubmit = message.trim().length > 0;
+  const canSubmit = message.trim().length > 0 && !isSubmitting;
 
   return (
     <KeyboardAvoidingView
@@ -48,7 +52,7 @@ function RequestForm({
     >
       {/* Header */}
       <View style={s.header}>
-        <TouchableOpacity style={s.backBtn} onPress={onCancel}>
+        <TouchableOpacity style={s.backBtn} onPress={onCancel} disabled={isSubmitting}>
           <Icon name="arrow-left" size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Demande de participation</Text>
@@ -92,6 +96,7 @@ function RequestForm({
               multiline
               numberOfLines={5}
               textAlignVertical="top"
+              editable={!isSubmitting}
             />
             <Text style={s.charCounter}>{message.length}/500</Text>
           </View>
@@ -107,6 +112,7 @@ function RequestForm({
                 style={[s.levelPill, level === opt.id && s.levelPillActive]}
                 onPress={() => setLevel(opt.id)}
                 activeOpacity={0.8}
+                disabled={isSubmitting}
               >
                 {level === opt.id && (
                   <LinearGradient
@@ -145,23 +151,9 @@ function RequestForm({
               placeholderTextColor={Colors.textMuted}
               autoCapitalize="none"
               keyboardType="url"
+              editable={!isSubmitting}
             />
           </View>
-        </View>
-
-        {/* Spécialités */}
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Vos spécialités</Text>
-          <View style={s.tagsRow}>
-            {specialties.map((tag) => (
-              <View key={tag} style={s.tag}>
-                <Text style={s.tagText}>{tag}</Text>
-              </View>
-            ))}
-          </View>
-          <Text style={s.tagHint}>
-            Issues de votre profil — modifiez-les dans Modifier le profil
-          </Text>
         </View>
 
         {/* Info tip */}
@@ -181,12 +173,16 @@ function RequestForm({
 
         {/* Actions */}
         <View style={s.actions}>
-          <TouchableOpacity style={s.cancelBtn} onPress={onCancel}>
+          <TouchableOpacity
+            style={s.cancelBtn}
+            onPress={onCancel}
+            disabled={isSubmitting}
+          >
             <Text style={s.cancelBtnText}>Annuler</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[s.submitBtn, !canSubmit && s.submitBtnDisabled]}
-            onPress={canSubmit ? onSubmit : undefined}
+            onPress={canSubmit ? () => onSubmit(message, portfolio || undefined) : undefined}
             activeOpacity={canSubmit ? 0.85 : 1}
           >
             <LinearGradient
@@ -195,8 +191,14 @@ function RequestForm({
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
             >
-              <Icon name="send" size={16} color="#fff" />
-              <Text style={s.submitBtnText}>Envoyer la demande</Text>
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Icon name="send" size={16} color="#fff" />
+              )}
+              <Text style={s.submitBtnText}>
+                {isSubmitting ? "Envoi en cours..." : "Envoyer la demande"}
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -300,8 +302,22 @@ export default function EventRequestScreen() {
     title: string;
   }>();
   const [submitted, setSubmitted] = useState(false);
+  const requestJoin = useRequestJoin();
 
   const eventTitle = title ?? "Événement";
+
+  const handleSubmit = async (message: string, portfolioUrl?: string) => {
+    if (!eventId) return;
+    try {
+      await requestJoin.mutateAsync({ eventId, message, portfolioUrl });
+      setSubmitted(true);
+    } catch {
+      Alert.alert(
+        "Erreur",
+        "Impossible d'envoyer la demande. Veuillez réessayer."
+      );
+    }
+  };
 
   if (submitted) {
     return (
@@ -329,7 +345,8 @@ export default function EventRequestScreen() {
       />
       <RequestForm
         eventTitle={eventTitle}
-        onSubmit={() => setSubmitted(true)}
+        onSubmit={handleSubmit}
+        isSubmitting={requestJoin.isPending}
         onCancel={() => router.back()}
       />
     </View>
@@ -478,31 +495,6 @@ const s = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     color: Colors.textPrimary,
-  },
-
-  // Tags
-  tagsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  tag: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: "rgba(123,47,190,0.2)",
-    borderWidth: 1,
-    borderColor: "rgba(123,47,190,0.4)",
-  },
-  tagText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: Colors.accentPurple,
-  },
-  tagHint: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    fontStyle: "italic",
   },
 
   // Info card

@@ -229,10 +229,12 @@ export default function AnalysisScreen() {
             </View>
           </LinearGradient>
         </Animated.View>
-
-        {/* Next button */}
-        <GradientButton label="Suivant" onPress={handleNext} style={styles.cta} />
       </ScrollView>
+
+      {/* Button pinned at bottom */}
+      <View style={styles.ctaContainer}>
+        <GradientButton label="Suivant" onPress={handleNext} />
+      </View>
     </View>
   );
 }
@@ -245,8 +247,13 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingTop: Platform.OS === "ios" ? 60 : 40,
     paddingHorizontal: 20,
-    paddingBottom: 50,
+    paddingBottom: 16,
     gap: 16,
+  },
+  ctaContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === "ios" ? 34 : 20,
+    paddingTop: 12,
   },
 
   // Header

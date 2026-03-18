@@ -22,7 +22,6 @@ import { Colors, Gradients } from "../../theme/colors";
 import { Fonts } from "../../theme/typography";
 import { KaytiHeader } from "../../components/ui";
 import { Icon, IconName } from "../../components/ui/Icon";
-import { BottomTabBar } from "../../components/ui";
 import { aiApi } from "../../services/api/ai.api";
 
 const { width } = Dimensions.get("window");
@@ -436,7 +435,6 @@ export default function RetoucheScreen() {
           </View>
         </ScrollView>
 
-        <BottomTabBar activeRoute="/(tabs)/camera" />
       </View>
     );
   }
@@ -640,7 +638,6 @@ export default function RetoucheScreen() {
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      <BottomTabBar activeRoute="/(tabs)/camera" />
     </View>
   );
 }

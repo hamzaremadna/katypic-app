@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -20,6 +20,9 @@ import { Colors, Gradients } from "../../theme/colors";
 import { Fonts } from "../../theme/typography";
 import { Icon } from "../../components/ui/Icon";
 import { profileApi } from "../../services/api/profile.api";
+import { Story } from "../../services/api/story.api";
+import { useUserStories } from "../../hooks/useStories";
+import { StoryViewer } from "../../components/profile/StoryViewer";
 
 const { width } = Dimensions.get("window");
 const PHOTO_SIZE = (width - 40 - 8) / 3;
@@ -83,6 +86,9 @@ export default function PublicProfileScreen() {
       `/chat/${userId}?name=${encodeURIComponent(displayName)}`
     );
   };
+
+  const [viewerStory, setViewerStory] = useState<Story | null>(null);
+  const { data: userStories = [] } = useUserStories(userId);
 
   // ── Loading ──
   if (isLoading) {
@@ -212,6 +218,53 @@ export default function PublicProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* ── À la une ── */}
+        {userStories.length > 0 && (
+          <View style={s.storiesSection}>
+            <Text style={s.storiesSectionTitle}>À la une</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.storiesRow}
+            >
+              {userStories.map((story) => (
+                <TouchableOpacity
+                  key={story.id}
+                  style={s.storyItem}
+                  onPress={() => setViewerStory(story)}
+                  activeOpacity={0.8}
+                >
+                  <View style={s.storyRing}>
+                    <LinearGradient
+                      colors={Gradients.brand as [string, string]}
+                      style={StyleSheet.absoluteFillObject}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                    />
+                    <View style={s.storyInner}>
+                      {story.coverUrl ? (
+                        <Image
+                          source={{ uri: story.coverUrl }}
+                          style={{ width: "100%", height: "100%" }}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <LinearGradient
+                          colors={["#2D1060", "#1A1040"]}
+                          style={{ flex: 1 }}
+                        />
+                      )}
+                    </View>
+                  </View>
+                  <Text style={s.storyLabel} numberOfLines={1}>
+                    {story.title}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {/* ── Section title ── */}
         <View style={s.sectionHeader}>
           <Text style={s.sectionTitle}>Photos</Text>
@@ -251,6 +304,12 @@ export default function PublicProfileScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <StoryViewer
+        story={viewerStory}
+        visible={viewerStory !== null}
+        onClose={() => setViewerStory(null)}
+      />
     </View>
   );
 }
@@ -463,5 +522,38 @@ const s = StyleSheet.create({
     fontFamily: Fonts.medium,
     fontSize: 14,
     color: Colors.textSecondary,
+  },
+
+  // À la une stories
+  storiesSection: { marginTop: 20, gap: 12 },
+  storiesSectionTitle: {
+    fontFamily: Fonts.extrabold,
+    fontSize: 16,
+    color: Colors.textPrimary,
+    paddingHorizontal: 20,
+  },
+  storiesRow: { paddingHorizontal: 20, gap: 16 },
+  storyItem: { alignItems: "center", gap: 6, width: 68 },
+  storyRing: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    overflow: "hidden",
+    position: "relative",
+  },
+  storyInner: {
+    position: "absolute",
+    top: 2.5,
+    left: 2.5,
+    right: 2.5,
+    bottom: 2.5,
+    borderRadius: 30,
+    overflow: "hidden",
+  },
+  storyLabel: {
+    fontFamily: Fonts.medium,
+    fontSize: 11,
+    color: Colors.textSecondary,
+    textAlign: "center",
   },
 });

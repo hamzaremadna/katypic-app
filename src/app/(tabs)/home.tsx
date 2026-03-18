@@ -424,7 +424,11 @@ export default function HomeScreen() {
             <Text style={s.shortcutLabel}>Ma Galerie</Text>
           </TouchableOpacity>
 
-          <View style={s.avatarCenter}>
+          <TouchableOpacity
+            style={s.avatarCenter}
+            onPress={() => navigate("/(tabs)/profile")}
+            activeOpacity={0.8}
+          >
             <View style={s.avatarRing}>
               <View style={s.avatarPhoto}>
                 <LinearGradient
@@ -436,7 +440,7 @@ export default function HomeScreen() {
             <Text style={s.greeting}>
               Hello, <Text style={s.greetingName}>{displayName}</Text>
             </Text>
-          </View>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={s.conseilShortcut}

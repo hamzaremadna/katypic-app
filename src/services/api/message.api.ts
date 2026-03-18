@@ -10,11 +10,11 @@ export interface Conversation {
 
 export interface DirectMessage {
   id: string;
-  sender_id: string;
-  receiver_id: string;
+  senderId: string;
+  receiverId: string;
   content: string;
-  is_read: boolean;
-  created_at: string;
+  isRead: boolean;
+  createdAt: string;
 }
 
 export const messageApi = {

@@ -17,7 +17,6 @@ import { navigate } from "@/utils/navigation";
 import { StatusBar } from "expo-status-bar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors, Gradients } from "../../theme/colors";
-import { BottomTabBar } from "../../components/ui";
 import { Icon } from "../../components/ui/Icon";
 import { messageApi, DirectMessage } from "../../services/api/message.api";
 import { useAuthStore } from "../../stores/authStore";
@@ -39,7 +38,7 @@ function MessageBubble({
   message: DirectMessage;
   myId?: string;
 }) {
-  const isMe = myId ? message.sender_id === myId : false;
+  const isMe = myId ? message.senderId === myId : false;
   return (
     <View style={[s.bubbleRow, isMe && s.bubbleRowMe]}>
       <View style={[s.bubble, isMe ? s.bubbleMe : s.bubbleOther]}>
@@ -54,7 +53,7 @@ function MessageBubble({
         <Text style={s.bubbleText}>{message.content}</Text>
       </View>
       <Text style={[s.time, isMe && s.timeMe]}>
-        {formatTime(message.created_at)}
+        {formatTime(message.createdAt)}
       </Text>
     </View>
   );
@@ -216,7 +215,6 @@ export default function ChatScreen() {
           </TouchableOpacity>
         </View>
 
-        <BottomTabBar activeRoute="/(tabs)/profile" />
       </View>
     </KeyboardAvoidingView>
   );
@@ -296,7 +294,7 @@ const s = StyleSheet.create({
     gap: 8,
     borderTopWidth: 1,
     borderTopColor: Colors.divider,
-    marginBottom: 80,
+    marginBottom: 0,
   },
   inputIcon: { borderRadius: 20, overflow: "hidden" },
   inputIconGrad: {

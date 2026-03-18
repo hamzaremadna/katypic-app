@@ -16,7 +16,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { navigateReplace } from "@/utils/navigation";
 import { Colors, Gradients } from "../../theme/colors";
-import { KaytiHeader, BottomTabBar } from "../../components/ui";
+import { KaytiHeader } from "../../components/ui";
 import { Icon } from "../../components/ui/Icon";
 import { eventApi } from "../../services/api/event.api";
 
@@ -416,7 +416,6 @@ export default function CreateEventScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <BottomTabBar activeRoute="/(tabs)/discover" />
     </View>
   );
 }

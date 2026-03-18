@@ -6,11 +6,11 @@ import { Fonts } from "@theme/typography";
 
 const QUESTIONS = [
   "Comment photographier un coucher de soleil ?",
-  "Quel appareil photo acheter pour débuter ?",
+  "Quel appareil photo pour débuter ?",
   "Quels spots photo visiter à Paris ?",
   "Comment éviter les photos floues ?",
   "Quel objectif pour des portraits ?",
-  "Conseils pour photo de rue",
+  "Conseils pour la photo de rue",
 ];
 
 export function SuggestionChips({
@@ -21,16 +21,16 @@ export function SuggestionChips({
   onQuestionPress: (index: number, question: string) => void;
 }) {
   return (
-    <View style={s.questionsSection}>
-      <Text style={s.questionsLabel}>QUESTIONS FRÉQUENTES</Text>
+    <View style={s.section}>
+      <Text style={s.label}>QUESTIONS FRÉQUENTES</Text>
 
-      <View style={s.questionsList}>
+      <View style={s.list}>
         {QUESTIONS.map((q, i) => {
           const isSelected = selectedQuestion === i;
           return (
             <TouchableOpacity
               key={i}
-              style={s.questionCardWrap}
+              style={s.cardWrap}
               onPress={() => onQuestionPress(i, q)}
               activeOpacity={0.8}
             >
@@ -39,13 +39,13 @@ export function SuggestionChips({
                   colors={["#5B2FBE", "#2B7FFF"]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
-                  style={s.questionCardGradient}
+                  style={s.cardGradient}
                 >
-                  <Text style={s.questionText}>{q}</Text>
+                  <Text style={s.text}>{q}</Text>
                 </LinearGradient>
               ) : (
-                <View style={s.questionCard}>
-                  <Text style={s.questionText}>{q}</Text>
+                <View style={s.card}>
+                  <Text style={s.text}>{q}</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -57,26 +57,26 @@ export function SuggestionChips({
 }
 
 const s = StyleSheet.create({
-  questionsSection: {
-    paddingHorizontal: 28,
-    paddingTop: 28,
-    gap: 16,
+  section: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    gap: 14,
   },
-  questionsLabel: {
+  label: {
     fontFamily: Fonts.bold,
-    fontSize: 13,
+    fontSize: 11,
     color: Colors.accentPurple,
     letterSpacing: 1.5,
     textAlign: "center",
   },
-  questionsList: {
-    gap: 10,
+  list: {
+    gap: 8,
   },
-  questionCardWrap: {
+  cardWrap: {
     borderRadius: 14,
     overflow: "hidden",
   },
-  questionCard: {
+  card: {
     backgroundColor: Colors.bgCard,
     borderRadius: 14,
     paddingHorizontal: 20,
@@ -84,14 +84,16 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.cardBorder,
   },
-  questionCardGradient: {
+  cardGradient: {
     borderRadius: 14,
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
-  questionText: {
+  text: {
     fontFamily: Fonts.medium,
-    fontSize: 15,
+    fontSize: 14,
     color: Colors.textPrimary,
+    flex: 1,
+    lineHeight: 20,
   },
 });

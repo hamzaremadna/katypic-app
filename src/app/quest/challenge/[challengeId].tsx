@@ -18,6 +18,7 @@ import { Colors } from "../../../theme/colors";
 import { Fonts } from "../../../theme/typography";
 import { Icon, IconName } from "../../../components/ui/Icon";
 import { useSyncQuestProgress, useCompleteQuest } from "../../../hooks/useQuestPaths";
+import { hapticLight, hapticMedium, hapticSuccess, hapticError } from "../../../utils/haptics";
 
 const { width } = Dimensions.get("window");
 const PHOTO_SIZE = (width - 52) / 2;
@@ -87,16 +88,19 @@ export default function ChallengeDetailScreen() {
       : "Prenez votre temps, expérimentez différentes approches et n'hésitez pas à sortir de votre zone de confort !";
 
   const handleAddPhoto = () => {
+    hapticLight();
     navigate("/(tabs)/camera");
   };
 
   const handleValidate = () => {
     if (!canValidate) return;
+    hapticMedium();
     completeMutation.mutate(challengeId, {
       onSuccess: (data) => {
         if (data.alreadyCompleted) {
           router.back();
         } else {
+          hapticSuccess(); // triple beat — quest complete!
           Alert.alert(
             "🏆 Défi complété !",
             `Félicitations ! Vous gagnez +${data.xpEarned} XP`,
@@ -105,6 +109,7 @@ export default function ChallengeDetailScreen() {
         }
       },
       onError: () => {
+        hapticError();
         Alert.alert("Erreur", "Impossible de valider le défi pour l'instant.");
       },
     });

@@ -8,83 +8,69 @@ import {
   Dimensions,
   Image,
   Share,
-  Alert,
   Linking,
+  Modal,
+  TextInput,
+  ActivityIndicator,
+  Alert,
+  Platform,
+  KeyboardAvoidingView,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { useLocalSearchParams } from "expo-router";
 import { Colors, Gradients } from "../../theme/colors";
-import { KaytiHeader, BottomTabBar, GradientButton } from "../../components/ui";
+import { KaytiHeader, GradientButton } from "../../components/ui";
 import { Icon } from "../../components/ui/Icon";
+import { useSpot, useSpotReviews, useToggleFavorite, useAddSpotReview } from "@/hooks/useSpots";
+import type { SpotReview } from "@/services/api/spot.api";
 
 const { width } = Dimensions.get("window");
 const PHOTO_THUMB_SIZE = (width - 40 - 30) / 4;
 
-// ─── Mock Data ──────────────────────────────────────────
-const SPOT_DATA = {
-  name: "Pont Alexandre III",
-  subtitle: "Architecture Belle Époque",
-  rating: 4.3,
-  reviewCount: 4,
-  category: "architecture",
-  description:
-    "Un des plus beaux ponts de Paris, idéal pour la photographie avec ses lampadaires dorés et sa vue imprenable sur les Invalides et le Grand Palais.",
-  photos: [
-    { id: "1", uri: "" },
-    { id: "2", uri: "" },
-    { id: "3", uri: "" },
-    { id: "4", uri: "" },
-  ],
-  reviews: [
-    {
-      id: "1",
-      name: "Marie D.",
-      date: "il y a 3 jours",
-      rating: 5,
-      text: "Endroit magnifique pour des photos au coucher du soleil. Les lampadaires dorés créent une lumière incroyable.",
-      helpful: 12,
-      avatarColor: "#E91E8C",
-    },
-    {
-      id: "2",
-      name: "Lucas B.",
-      date: "il y a 1 semaine",
-      rating: 4,
-      text: "Très beau spot mais souvent bondé. Préférez tôt le matin pour éviter la foule.",
-      helpful: 8,
-      avatarColor: "#7B2FBE",
-    },
-    {
-      id: "3",
-      name: "Sophie T.",
-      date: "il y a 2 semaines",
-      rating: 4,
-      text: "Parfait pour les portraits avec le fond des Invalides. La lumière dorée en fin de journée est sublime.",
-      helpful: 5,
-      avatarColor: "#4A90E2",
-    },
-  ],
-  ratingBreakdown: {
-    5: 0.5,
-    4: 0.35,
-    3: 0.1,
-    2: 0.05,
-    1: 0,
-  },
-};
+const AVATAR_COLORS = ["#E91E8C", "#7B2FBE", "#4A90E2", "#27AE60", "#FF8C00", "#E74C3C"];
+
+function formatTimeAgo(isoDate: string): string {
+  const now = new Date();
+  const date = new Date(isoDate);
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return "aujourd'hui";
+  if (diffDays === 1) return "il y a 1 jour";
+  if (diffDays < 7) return `il y a ${diffDays} jours`;
+  if (diffDays < 14) return "il y a 1 semaine";
+  if (diffDays < 30) return `il y a ${Math.floor(diffDays / 7)} semaines`;
+  if (diffDays < 60) return "il y a 1 mois";
+  return `il y a ${Math.floor(diffDays / 30)} mois`;
+}
 
 // ─── Star Rating Component ──────────────────────────────
-function StarRating({ rating, size = 14 }: { rating: number; size?: number }) {
+function StarRating({
+  rating,
+  size = 14,
+  interactive = false,
+  onSelect,
+}: {
+  rating: number;
+  size?: number;
+  interactive?: boolean;
+  onSelect?: (star: number) => void;
+}) {
   const stars = [];
   for (let i = 1; i <= 5; i++) {
     stars.push(
-      <Icon
+      <TouchableOpacity
         key={i}
-        name="star"
-        size={size}
-        color={i <= Math.round(rating) ? "#FFD700" : Colors.textMuted}
-      />
+        onPress={interactive && onSelect ? () => onSelect(i) : undefined}
+        disabled={!interactive}
+        activeOpacity={interactive ? 0.7 : 1}
+      >
+        <Icon
+          name="star"
+          size={size}
+          color={i <= Math.round(rating) ? "#FFD700" : Colors.textMuted}
+        />
+      </TouchableOpacity>
     );
   }
   return <View style={{ flexDirection: "row", gap: 2 }}>{stars}</View>;
@@ -99,7 +85,7 @@ function RatingBar({ stars, percentage }: { stars: number; percentage: number })
       <View style={s.ratingBarTrack}>
         <LinearGradient
           colors={stars >= 4 ? ["#FFD700", "#FFA500"] : ["#FFA500", "#FF8C00"]}
-          style={[s.ratingBarFill, { width: `${percentage * 100}%` }]}
+          style={[s.ratingBarFill, { width: `${Math.min(percentage * 100, 100)}%` as `${number}%` }]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
         />
@@ -111,43 +97,210 @@ function RatingBar({ stars, percentage }: { stars: number; percentage: number })
 // ─── Review Card Component ──────────────────────────────
 function ReviewCard({
   review,
+  index,
 }: {
-  review: (typeof SPOT_DATA.reviews)[0];
+  review: SpotReview;
+  index: number;
 }) {
-  const [isHelpful, setIsHelpful] = useState(false);
+  const displayName = review.user.profile?.displayName ?? review.user.username;
+  const avatarColor = AVATAR_COLORS[index % AVATAR_COLORS.length];
 
   return (
     <View style={s.reviewCard}>
       <View style={s.reviewHeader}>
-        <View
-          style={[s.reviewAvatar, { backgroundColor: review.avatarColor }]}
-        >
-          <Text style={s.reviewAvatarText}>{review.name[0]}</Text>
-        </View>
+        {review.user.profile?.avatarUrl ? (
+          <Image
+            source={{ uri: review.user.profile.avatarUrl }}
+            style={s.reviewAvatar}
+          />
+        ) : (
+          <View style={[s.reviewAvatar, { backgroundColor: avatarColor }]}>
+            <Text style={s.reviewAvatarText}>
+              {displayName[0].toUpperCase()}
+            </Text>
+          </View>
+        )}
         <View style={{ flex: 1 }}>
-          <Text style={s.reviewName}>{review.name}</Text>
-          <Text style={s.reviewDate}>{review.date}</Text>
+          <Text style={s.reviewName}>{displayName}</Text>
+          <Text style={s.reviewDate}>{formatTimeAgo(review.createdAt)}</Text>
         </View>
         <StarRating rating={review.rating} size={12} />
       </View>
-      <Text style={s.reviewText}>{review.text}</Text>
-      <TouchableOpacity
-        style={[s.helpfulBtn, isHelpful && s.helpfulBtnActive]}
-        onPress={() => setIsHelpful(!isHelpful)}
-      >
-        <Text style={[s.helpfulText, isHelpful && s.helpfulTextActive]}>
-          👍 Utile ({isHelpful ? review.helpful + 1 : review.helpful})
-        </Text>
-      </TouchableOpacity>
+      {review.comment ? (
+        <Text style={s.reviewText}>{review.comment}</Text>
+      ) : null}
     </View>
+  );
+}
+
+// ─── Review Modal ───────────────────────────────────────
+function ReviewModal({
+  visible,
+  onClose,
+  onSubmit,
+  isSubmitting,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onSubmit: (rating: number, comment?: string) => void;
+  isSubmitting: boolean;
+}) {
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState("");
+
+  const canSubmit = rating > 0 && !isSubmitting;
+
+  const handleClose = () => {
+    setRating(0);
+    setComment("");
+    onClose();
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={handleClose}
+    >
+      <KeyboardAvoidingView
+        style={s.modalOverlay}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={handleClose} activeOpacity={1} />
+        <View style={s.modalSheet}>
+          <LinearGradient
+            colors={["#1A1040", "#0E0A24"]}
+            style={StyleSheet.absoluteFillObject}
+          />
+          {/* Handle */}
+          <View style={s.modalHandle} />
+
+          <Text style={s.modalTitle}>Donner mon avis</Text>
+          <Text style={s.modalSubtitle}>Comment évaluez-vous ce spot ?</Text>
+
+          {/* Star selector */}
+          <View style={s.modalStarRow}>
+            <StarRating rating={rating} size={36} interactive onSelect={setRating} />
+          </View>
+          {rating > 0 && (
+            <Text style={s.modalRatingLabel}>
+              {["", "Mauvais", "Décevant", "Correct", "Bien", "Excellent !"][rating]}
+            </Text>
+          )}
+
+          {/* Comment */}
+          <View style={s.modalTextAreaWrapper}>
+            <TextInput
+              style={s.modalTextArea}
+              value={comment}
+              onChangeText={(t) => t.length <= 300 && setComment(t)}
+              placeholder="Partagez votre expérience (facultatif)..."
+              placeholderTextColor={Colors.textMuted}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+              editable={!isSubmitting}
+            />
+            <Text style={s.charCounter}>{comment.length}/300</Text>
+          </View>
+
+          {/* Buttons */}
+          <View style={s.modalActions}>
+            <TouchableOpacity style={s.modalCancelBtn} onPress={handleClose} disabled={isSubmitting}>
+              <Text style={s.modalCancelText}>Annuler</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.modalSubmitBtn, !canSubmit && s.modalSubmitDisabled]}
+              onPress={canSubmit ? () => onSubmit(rating, comment || undefined) : undefined}
+              activeOpacity={canSubmit ? 0.85 : 1}
+            >
+              <LinearGradient
+                colors={canSubmit ? (["#E91E8C", "#7B2FBE"] as [string, string]) : (["#333", "#333"] as [string, string])}
+                style={s.modalSubmitGrad}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={s.modalSubmitText}>Publier l'avis</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
 // ─── Main Screen ────────────────────────────────────────
 export default function SpotDetailScreen() {
-  const { spotId } = useLocalSearchParams();
-  const spot = SPOT_DATA;
-  const [saved, setSaved] = useState(false);
+  const { spotId } = useLocalSearchParams<{ spotId: string }>();
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+
+  const { data: spot, isLoading: spotLoading } = useSpot(spotId ?? "");
+  const { data: reviewsData, isLoading: reviewsLoading } = useSpotReviews(spotId ?? "");
+  const toggleFavorite = useToggleFavorite();
+  const addReview = useAddSpotReview();
+
+  const isFavorited = spot?.isFavorited ?? false;
+
+  const handleToggleFavorite = () => {
+    if (!spotId) return;
+    toggleFavorite.mutate(spotId);
+  };
+
+  const handleAddReview = async (rating: number, comment?: string) => {
+    if (!spotId) return;
+    try {
+      await addReview.mutateAsync({ spotId, rating, comment });
+      setReviewModalVisible(false);
+    } catch {
+      Alert.alert("Erreur", "Impossible de publier votre avis. Réessayez.");
+    }
+  };
+
+  const handleGoThere = () => {
+    if (!spot) return;
+    const url = Platform.OS === "ios"
+      ? `maps://?q=${spot.latitude},${spot.longitude}`
+      : `geo:${spot.latitude},${spot.longitude}?q=${spot.latitude},${spot.longitude}`;
+    Linking.openURL(url).catch(() => {
+      Linking.openURL(
+        `https://maps.google.com/maps?q=${spot.latitude},${spot.longitude}`
+      );
+    });
+  };
+
+  if (spotLoading) {
+    return (
+      <View style={[s.container, s.centered]}>
+        <StatusBar style="light" />
+        <LinearGradient colors={["#0E0A24", "#080814"]} style={StyleSheet.absoluteFillObject} />
+        <KaytiHeader showBack title="Détail spot" />
+        <ActivityIndicator size="large" color={Colors.accentPurple} style={{ marginTop: 40 }} />
+      </View>
+    );
+  }
+
+  if (!spot) {
+    return (
+      <View style={[s.container, s.centered]}>
+        <StatusBar style="light" />
+        <LinearGradient colors={["#0E0A24", "#080814"]} style={StyleSheet.absoluteFillObject} />
+        <KaytiHeader showBack title="Détail spot" />
+        <Text style={s.emptyText}>Spot introuvable.</Text>
+      </View>
+    );
+  }
+
+  const stats = reviewsData?.stats;
+  const reviews = reviewsData?.reviews ?? [];
+  const avgRating = stats?.average ?? spot.averageRating ?? 0;
+  const totalReviews = stats?.total ?? 0;
+  const histogram = stats?.histogram ?? {};
 
   return (
     <View style={s.container}>
@@ -166,10 +319,18 @@ export default function SpotDetailScreen() {
         {/* Cover Image */}
         <View style={s.coverWrapper}>
           <View style={s.coverImage}>
-            <LinearGradient
-              colors={["#2D1B69", "#1A1A2E"]}
-              style={StyleSheet.absoluteFillObject}
-            />
+            {spot.thumbnailUrl ? (
+              <Image
+                source={{ uri: spot.thumbnailUrl }}
+                style={StyleSheet.absoluteFillObject}
+                resizeMode="cover"
+              />
+            ) : (
+              <LinearGradient
+                colors={["#2D1B69", "#1A1A2E"]}
+                style={StyleSheet.absoluteFillObject}
+              />
+            )}
             <LinearGradient
               colors={["transparent", "rgba(10,10,20,0.6)"]}
               style={StyleSheet.absoluteFillObject}
@@ -188,12 +349,13 @@ export default function SpotDetailScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={s.coverActionBtn}
-                  onPress={() => setSaved((prev) => !prev)}
+                  onPress={handleToggleFavorite}
+                  disabled={toggleFavorite.isPending}
                 >
                   <Icon
                     name="heart"
                     size={18}
-                    color={saved ? "#FF2D55" : Colors.textPrimary}
+                    color={isFavorited ? "#FF2D55" : Colors.textPrimary}
                   />
                 </TouchableOpacity>
               </View>
@@ -210,14 +372,16 @@ export default function SpotDetailScreen() {
             end={{ x: 1, y: 1 }}
           />
           <Text style={s.spotName}>{spot.name}</Text>
-          <View style={s.spotLocationRow}>
-            <Icon name="marker-pin" size={14} color={Colors.textSecondary} />
-            <Text style={s.spotLocation}>{spot.subtitle}</Text>
-          </View>
+          {spot.address ? (
+            <View style={s.spotLocationRow}>
+              <Icon name="marker-pin" size={14} color={Colors.textSecondary} />
+              <Text style={s.spotLocation}>{spot.address}</Text>
+            </View>
+          ) : null}
           <View style={s.ratingRow}>
-            <StarRating rating={spot.rating} size={16} />
+            <StarRating rating={avgRating} size={16} />
             <Text style={s.ratingText}>
-              {spot.rating} ({spot.reviewCount} avis)
+              {avgRating > 0 ? avgRating.toFixed(1) : "—"} ({totalReviews} avis)
             </Text>
             <View style={s.categoryTag}>
               <Text style={s.categoryTagText}>{spot.category}</Text>
@@ -225,56 +389,57 @@ export default function SpotDetailScreen() {
           </View>
           <GradientButton
             label="Y aller"
-            onPress={() =>
-              Linking.openURL(
-                `https://maps.google.com/maps?q=${spot.name.replace(/ /g, "+")}+Paris`
-              )
-            }
+            onPress={handleGoThere}
             arrow
             style={{ marginTop: 12 }}
           />
         </View>
 
         {/* Photos du spot */}
-        <View style={s.section}>
-          <View style={s.sectionHeader}>
-            <Text style={s.sectionTitle}>Photos du spot</Text>
-            <TouchableOpacity>
-              <Text style={s.sectionLink}>
-                Voir tout ({spot.photos.length})
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={s.photosRow}
-          >
-            {spot.photos.map((photo) => (
-              <TouchableOpacity key={photo.id} style={s.photoThumb}>
-                <LinearGradient
-                  colors={["#2D1B69", "#1A1A2E"]}
-                  style={StyleSheet.absoluteFillObject}
-                />
+        {spot.photos && spot.photos.length > 0 ? (
+          <View style={s.section}>
+            <View style={s.sectionHeader}>
+              <Text style={s.sectionTitle}>Photos du spot</Text>
+              <TouchableOpacity>
+                <Text style={s.sectionLink}>
+                  Voir tout ({spot.photos.length})
+                </Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.photosRow}
+            >
+              {spot.photos.map((item) => (
+                <TouchableOpacity key={item.id} style={s.photoThumb}>
+                  {item.photo.thumbnailUrl || item.photo.url ? (
+                    <Image
+                      source={{ uri: item.photo.thumbnailUrl ?? item.photo.url }}
+                      style={StyleSheet.absoluteFillObject}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <LinearGradient
+                      colors={["#2D1B69", "#1A1A2E"]}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
 
         {/* Avis section */}
         <View style={s.section}>
           <View style={s.sectionHeader}>
             <Text style={s.sectionTitle}>
-              Avis ({spot.reviewCount})
+              Avis ({totalReviews})
             </Text>
             <TouchableOpacity
               style={s.reviewBtn}
-              onPress={() =>
-                Alert.alert(
-                  "Bientôt disponible",
-                  "La publication d'avis sera disponible prochainement."
-                )
-              }
+              onPress={() => setReviewModalVisible(true)}
             >
               <LinearGradient
                 colors={Gradients.brand}
@@ -288,40 +453,59 @@ export default function SpotDetailScreen() {
           </View>
 
           {/* Rating breakdown card */}
-          <View style={s.breakdownCard}>
-            <View style={s.breakdownLeft}>
-              <Text style={s.breakdownBigNumber}>{spot.rating}</Text>
-              <StarRating rating={spot.rating} size={18} />
-              <Text style={s.breakdownCount}>
-                {spot.reviewCount} avis
-              </Text>
+          {totalReviews > 0 ? (
+            <View style={s.breakdownCard}>
+              <View style={s.breakdownLeft}>
+                <Text style={s.breakdownBigNumber}>
+                  {avgRating.toFixed(1)}
+                </Text>
+                <StarRating rating={avgRating} size={18} />
+                <Text style={s.breakdownCount}>{totalReviews} avis</Text>
+              </View>
+              <View style={s.breakdownRight}>
+                {[5, 4, 3, 2, 1].map((star) => (
+                  <RatingBar
+                    key={star}
+                    stars={star}
+                    percentage={
+                      totalReviews > 0
+                        ? (histogram[star] ?? 0) / totalReviews
+                        : 0
+                    }
+                  />
+                ))}
+              </View>
             </View>
-            <View style={s.breakdownRight}>
-              {[5, 4, 3, 2, 1].map((star) => (
-                <RatingBar
-                  key={star}
-                  stars={star}
-                  percentage={
-                    spot.ratingBreakdown[
-                      star as keyof typeof spot.ratingBreakdown
-                    ]
-                  }
-                />
-              ))}
-            </View>
-          </View>
+          ) : null}
 
           {/* Review cards */}
-          {spot.reviews.map((review) => (
-            <ReviewCard key={review.id} review={review} />
-          ))}
+          {reviewsLoading ? (
+            <ActivityIndicator color={Colors.accentPurple} style={{ marginTop: 16 }} />
+          ) : reviews.length === 0 ? (
+            <View style={s.emptyReviews}>
+              <Icon name="star" size={32} color={Colors.textMuted} />
+              <Text style={s.emptyReviewsText}>
+                Aucun avis pour le moment. Soyez le premier !
+              </Text>
+            </View>
+          ) : (
+            reviews.map((review, idx) => (
+              <ReviewCard key={review.id} review={review} index={idx} />
+            ))
+          )}
         </View>
 
         {/* Bottom spacer for tab bar */}
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      <BottomTabBar activeRoute="/(tabs)/discover" />
+      {/* Review Modal */}
+      <ReviewModal
+        visible={reviewModalVisible}
+        onClose={() => setReviewModalVisible(false)}
+        onSubmit={handleAddReview}
+        isSubmitting={addReview.isPending}
+      />
     </View>
   );
 }
@@ -329,7 +513,15 @@ export default function SpotDetailScreen() {
 // ─── Styles ─────────────────────────────────────────────
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bgDeep },
+  centered: { alignItems: "center" },
   scroll: { paddingBottom: 20 },
+
+  emptyText: {
+    marginTop: 40,
+    fontSize: 16,
+    color: Colors.textMuted,
+    textAlign: "center",
+  },
 
   // Cover
   coverWrapper: { paddingHorizontal: 20, marginTop: 8 },
@@ -358,10 +550,6 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  coverActionIcon: {
-    color: Colors.textPrimary,
-    fontSize: 18,
-  },
 
   // Info Card
   infoCard: {
@@ -385,11 +573,11 @@ const s = StyleSheet.create({
     gap: 6,
     marginBottom: 12,
   },
-  locationIcon: { fontSize: 14 },
   spotLocation: {
     fontSize: 14,
     color: Colors.textSecondary,
     fontWeight: "500",
+    flex: 1,
   },
   ratingRow: {
     flexDirection: "row",
@@ -510,10 +698,6 @@ const s = StyleSheet.create({
     width: 10,
     textAlign: "right",
   },
-  ratingBarStar: {
-    fontSize: 10,
-    color: "#FFD700",
-  },
   ratingBarTrack: {
     flex: 1,
     height: 6,
@@ -568,25 +752,123 @@ const s = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 20,
   },
-  helpfulBtn: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 16,
+
+  // Empty reviews
+  emptyReviews: {
+    alignItems: "center",
+    paddingVertical: 32,
+    gap: 12,
+  },
+  emptyReviewsText: {
+    fontSize: 14,
+    color: Colors.textMuted,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+
+  // ── Review Modal ─────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.6)",
+  },
+  modalSheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingBottom: Platform.OS === "ios" ? 40 : 24,
+    paddingTop: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    borderBottomWidth: 0,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignSelf: "center",
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: Colors.textPrimary,
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: Colors.textMuted,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  modalStarRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginBottom: 8,
+    gap: 8,
+  },
+  modalRatingLabel: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFD700",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  modalTextAreaWrapper: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    padding: 14,
+    gap: 8,
+    marginBottom: 20,
+  },
+  modalTextArea: {
+    fontSize: 15,
+    color: Colors.textPrimary,
+    minHeight: 90,
+    textAlignVertical: "top",
+  },
+  charCounter: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    textAlign: "right",
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
     borderColor: Colors.cardBorder,
   },
-  helpfulBtnActive: {
-    backgroundColor: "rgba(123,47,190,0.2)",
-    borderColor: "rgba(123,47,190,0.5)",
-  },
-  helpfulText: {
-    fontSize: 12,
-    color: Colors.textMuted,
+  modalCancelText: {
+    fontSize: 15,
     fontWeight: "600",
+    color: Colors.textSecondary,
   },
-  helpfulTextActive: {
-    color: Colors.accentPurple,
+  modalSubmitBtn: {
+    flex: 2,
+    borderRadius: 14,
+    overflow: "hidden",
+  },
+  modalSubmitDisabled: { opacity: 0.4 },
+  modalSubmitGrad: {
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalSubmitText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#fff",
   },
 });

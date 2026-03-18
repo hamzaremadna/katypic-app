@@ -21,6 +21,7 @@ import { KaytiHeader, InputField } from "../../components/ui";
 import { Icon } from "../../components/ui/Icon";
 import { GoogleIcon } from "../../components/ui/GoogleIcon";
 import { useAuthStore } from "../../stores/authStore";
+import { hapticLight, hapticSuccess, hapticError } from "../../utils/haptics";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -97,13 +98,15 @@ export default function LoginScreen() {
     setValidationError(null);
     clearError();
     const trimmedEmail = email.trim();
-    if (!trimmedEmail) { setValidationError("Veuillez entrer votre email"); return; }
-    if (!password) { setValidationError("Veuillez entrer votre mot de passe"); return; }
+    if (!trimmedEmail) { hapticError(); setValidationError("Veuillez entrer votre email"); return; }
+    if (!password) { hapticError(); setValidationError("Veuillez entrer votre mot de passe"); return; }
+    hapticLight();
     setIsLoading(true);
     try {
       await login(trimmedEmail, password);
+      hapticSuccess();
       router.replace("/(tabs)/home");
-    } catch { /* error in store */ } finally { setIsLoading(false); }
+    } catch { hapticError(); } finally { setIsLoading(false); }
   };
 
   const handleAppleLogin = async () => {
@@ -147,7 +150,7 @@ export default function LoginScreen() {
             <View style={s.form}>
               <InputField label="Email" placeholder="vous@email.com" value={email} onChangeText={setEmail} icon="mail" keyboardType="email-address" />
               <View style={s.passwordBlock}>
-                <InputField label="Mot de passe" placeholder="········" value={password} onChangeText={setPassword} icon="lock" secureTextEntry />
+                <InputField label="Mot de passe" placeholder="········" value={password} onChangeText={setPassword} icon="lock" secureTextEntry showPasswordToggle />
                 <TouchableOpacity style={s.forgotBtn} onPress={() => Alert.alert("Bientôt disponible", "La réinitialisation du mot de passe sera disponible prochainement.")}>
                   <Text style={s.forgotText}>Mot de passe oublié ?</Text>
                 </TouchableOpacity>

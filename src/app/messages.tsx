@@ -16,7 +16,6 @@ import { StatusBar } from "expo-status-bar";
 import { useQuery } from "@tanstack/react-query";
 import { Colors, Gradients } from "../theme/colors";
 import { Fonts } from "../theme/typography";
-import { BottomTabBar } from "../components/ui";
 import { Icon } from "../components/ui/Icon";
 import { messageApi, Conversation } from "../services/api/message.api";
 
@@ -266,7 +265,6 @@ export default function MessagesScreen() {
         />
       )}
 
-      <BottomTabBar activeRoute="/(tabs)/profile" />
     </View>
   );
 }

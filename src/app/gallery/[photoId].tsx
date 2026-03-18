@@ -14,8 +14,9 @@ import { StatusBar } from "expo-status-bar";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Colors, Gradients } from "../../theme/colors";
 import { Fonts } from "../../theme/typography";
-import { KaytiHeader, BottomTabBar } from "../../components/ui";
+import { KaytiHeader } from "../../components/ui";
 import { Icon } from "../../components/ui/Icon";
+import { useDeletePhoto } from "../../hooks/usePhotos";
 
 const { width, height } = Dimensions.get("window");
 
@@ -28,6 +29,8 @@ export default function GalleryPhotoViewScreen() {
 
   const photoUri = params.photoUri ?? "";
   const photoId = params.photoId ?? "";
+
+  const deletePhoto = useDeletePhoto();
 
   const handleImport = () => {
     // Navigate to analysis import with this photo
@@ -71,7 +74,14 @@ export default function GalleryPhotoViewScreen() {
         {
           text: "Supprimer",
           style: "destructive",
-          onPress: () => router.back(),
+          onPress: async () => {
+            try {
+              await deletePhoto.mutateAsync(photoId);
+              router.back();
+            } catch {
+              Alert.alert("Erreur", "Impossible de supprimer la photo.");
+            }
+          },
         },
       ]
     );
@@ -152,7 +162,6 @@ export default function GalleryPhotoViewScreen() {
         </TouchableOpacity>
       </View>
 
-      <BottomTabBar activeRoute="/(tabs)/gallery" />
     </View>
   );
 }

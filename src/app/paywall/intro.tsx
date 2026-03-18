@@ -7,6 +7,7 @@ import {
   Platform,
   Dimensions,
   Animated,
+  Easing,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
@@ -17,6 +18,7 @@ import { Colors, Gradients } from "../../theme/colors";
 import { Fonts } from "../../theme/typography";
 import { Icon } from "../../components/ui/Icon";
 import { Mascot } from "../../components/ui/Mascot";
+import { hapticHeavy } from "../../utils/haptics";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -45,74 +47,399 @@ function GradientText({ text, style }: { text: string; style: any }) {
 export default function PaywallIntroScreen() {
   const router = useRouter();
 
-  const mascotAnim = useRef(new Animated.Value(0)).current;
-  const textAnim = useRef(new Animated.Value(0)).current;
-  const ctaAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(24)).current;
+  // ── Each element has its own animated values ──
+  const glowOpacity   = useRef(new Animated.Value(0)).current;
+
+  const closeFade     = useRef(new Animated.Value(0)).current;
+  const closeScale    = useRef(new Animated.Value(0.5)).current;
+
+  const sparkleFade   = useRef(new Animated.Value(0)).current;
+  const sparkleScale  = useRef(new Animated.Value(0.2)).current;
+  const sparkleRot    = useRef(new Animated.Value(-60)).current;
+
+  const lightningFade = useRef(new Animated.Value(0)).current;
+  const lightningX    = useRef(new Animated.Value(-50)).current;
+
+  const mascotFade    = useRef(new Animated.Value(0)).current;
+  const mascotScale   = useRef(new Animated.Value(0.55)).current;
+  const mascotY       = useRef(new Animated.Value(70)).current;
+  const mascotFloat   = useRef(new Animated.Value(0)).current;
+
+  const titleFade     = useRef(new Animated.Value(0)).current;
+  const titleY        = useRef(new Animated.Value(28)).current;
+
+  const subtitleFade  = useRef(new Animated.Value(0)).current;
+  const subtitleY     = useRef(new Animated.Value(16)).current;
+
+  const ctaFade       = useRef(new Animated.Value(0)).current;
+  const ctaY          = useRef(new Animated.Value(44)).current;
+  const ctaScale      = useRef(new Animated.Value(0.88)).current;
+
+  const starFade      = useRef(new Animated.Value(0)).current;
+  const starScale     = useRef(new Animated.Value(0.1)).current;
+  const starRot       = useRef(new Animated.Value(120)).current;
+
+  // ── Idle loop values (separate from entrance values) ──────────────────────
+  // Sparkle: twinkle scale + gentle rotation oscillation
+  const sparkleIdleScale = useRef(new Animated.Value(1)).current;
+  const sparkleIdleRot   = useRef(new Animated.Value(0)).current;
+  // Lightning: electric opacity flicker + micro Y bounce
+  const lightningFlicker = useRef(new Animated.Value(1)).current;
+  const lightningIdleY   = useRef(new Animated.Value(0)).current;
+  // Star: continuous 360° spin + scale breath
+  const starSpin         = useRef(new Animated.Value(0)).current;
+  const starBreath       = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.spring(slideAnim, { toValue: 0, tension: 60, friction: 10, useNativeDriver: true }),
-      Animated.stagger(120, [
-        Animated.timing(mascotAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-        Animated.timing(textAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-        Animated.timing(ctaAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-      ]),
-    ]).start();
+    // Background glow — slow, atmospheric
+    Animated.timing(glowOpacity, {
+      toValue: 1, duration: 900, useNativeDriver: true,
+    }).start();
+
+    // Close button — quick pop (100ms)
+    const t1 = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(closeFade, { toValue: 1, duration: 250, useNativeDriver: true }),
+        Animated.spring(closeScale, { toValue: 1, tension: 160, friction: 7, useNativeDriver: true }),
+      ]).start();
+    }, 100);
+
+    // Sparkle — rotates in from top-right (180ms)
+    const t2 = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(sparkleFade, { toValue: 1, duration: 450, useNativeDriver: true }),
+        Animated.spring(sparkleScale, { toValue: 1, tension: 90, friction: 7, useNativeDriver: true }),
+        Animated.spring(sparkleRot, { toValue: 0, tension: 70, friction: 9, useNativeDriver: true }),
+      ]).start();
+    }, 180);
+
+    // Lightning — slides in from the left (260ms)
+    const t3 = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(lightningFade, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.spring(lightningX, { toValue: 0, tension: 55, friction: 10, useNativeDriver: true }),
+      ]).start();
+    }, 260);
+
+    // Mascot — hero entrance: springs up + bounces scale (300ms)
+    const t4 = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(mascotFade, {
+          toValue: 1, duration: 380,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.spring(mascotScale, {
+          toValue: 1, tension: 48, friction: 5, useNativeDriver: true,
+        }),
+        Animated.spring(mascotY, {
+          toValue: 0, tension: 55, friction: 8, useNativeDriver: true,
+        }),
+      ]).start(() => {
+        // Continuous float loop after entrance
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(mascotFloat, {
+              toValue: -9, duration: 2000,
+              easing: Easing.inOut(Easing.sin), useNativeDriver: true,
+            }),
+            Animated.timing(mascotFloat, {
+              toValue: 0, duration: 2000,
+              easing: Easing.inOut(Easing.sin), useNativeDriver: true,
+            }),
+          ])
+        ).start();
+      });
+    }, 300);
+
+    // Title — slides up (580ms)
+    const t5 = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(titleFade, { toValue: 1, duration: 420, useNativeDriver: true }),
+        Animated.spring(titleY, { toValue: 0, tension: 75, friction: 12, useNativeDriver: true }),
+      ]).start();
+    }, 580);
+
+    // Subtitle — gentle fade + lift (730ms)
+    const t6 = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(subtitleFade, { toValue: 1, duration: 380, useNativeDriver: true }),
+        Animated.spring(subtitleY, { toValue: 0, tension: 70, friction: 13, useNativeDriver: true }),
+      ]).start();
+    }, 730);
+
+    // CTA button — pops up with energy (900ms)
+    const t7 = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(ctaFade, { toValue: 1, duration: 320, useNativeDriver: true }),
+        Animated.spring(ctaY, { toValue: 0, tension: 85, friction: 9, useNativeDriver: true }),
+        Animated.spring(ctaScale, { toValue: 1, tension: 100, friction: 7, useNativeDriver: true }),
+      ]).start();
+    }, 900);
+
+    // Star — spins in last (1020ms)
+    const t8 = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(starFade, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.spring(starScale, { toValue: 1, tension: 160, friction: 6, useNativeDriver: true }),
+        Animated.spring(starRot, { toValue: 0, tension: 80, friction: 8, useNativeDriver: true }),
+      ]).start();
+    }, 1020);
+
+    // ── SPARKLE idle — twinkle flash + gentle rotation oscillation ──
+    // Starts ~900ms (after entrance spring settles)
+    const t9 = setTimeout(() => {
+      // Scale twinkle: quick burst then rest
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(sparkleIdleScale, {
+            toValue: 1.4, duration: 200,
+            easing: Easing.out(Easing.quad), useNativeDriver: true,
+          }),
+          Animated.timing(sparkleIdleScale, {
+            toValue: 0.85, duration: 150,
+            easing: Easing.in(Easing.quad), useNativeDriver: true,
+          }),
+          Animated.timing(sparkleIdleScale, {
+            toValue: 1.0, duration: 200,
+            easing: Easing.out(Easing.quad), useNativeDriver: true,
+          }),
+          Animated.delay(1800),
+        ])
+      ).start();
+      // Rotation oscillation: independent cycle
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(sparkleIdleRot, {
+            toValue: 22, duration: 1400,
+            easing: Easing.inOut(Easing.sin), useNativeDriver: true,
+          }),
+          Animated.timing(sparkleIdleRot, {
+            toValue: -22, duration: 1400,
+            easing: Easing.inOut(Easing.sin), useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }, 900);
+
+    // ── LIGHTNING idle — electric flicker + micro zap ──
+    // Starts ~750ms (after timing entrance finishes)
+    const t10 = setTimeout(() => {
+      // Irregular opacity flicker to simulate electricity
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(1400),
+          Animated.timing(lightningFlicker, { toValue: 0.25, duration: 60, useNativeDriver: true }),
+          Animated.timing(lightningFlicker, { toValue: 1.0,  duration: 50, useNativeDriver: true }),
+          Animated.timing(lightningFlicker, { toValue: 0.45, duration: 70, useNativeDriver: true }),
+          Animated.timing(lightningFlicker, { toValue: 1.0,  duration: 60, useNativeDriver: true }),
+          Animated.delay(200),
+          Animated.timing(lightningFlicker, { toValue: 0.3,  duration: 50, useNativeDriver: true }),
+          Animated.timing(lightningFlicker, { toValue: 1.0,  duration: 80, useNativeDriver: true }),
+        ])
+      ).start();
+      // Micro Y bounce on each zap
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(1400),
+          Animated.timing(lightningIdleY, {
+            toValue: -6, duration: 120,
+            easing: Easing.out(Easing.quad), useNativeDriver: true,
+          }),
+          Animated.timing(lightningIdleY, {
+            toValue: 0, duration: 300,
+            easing: Easing.out(Easing.bounce), useNativeDriver: true,
+          }),
+          Animated.delay(1800),
+        ])
+      ).start();
+    }, 750);
+
+    // ── STAR idle — slow continuous spin + scale breath ──
+    // Starts ~1500ms (after entrance spring settles)
+    const t11 = setTimeout(() => {
+      // Continuous 360° rotation
+      Animated.loop(
+        Animated.timing(starSpin, {
+          toValue: 1, duration: 4000,
+          easing: Easing.linear, useNativeDriver: true,
+        })
+      ).start();
+      // Scale breath: in and out like breathing
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(starBreath, {
+            toValue: 1.3, duration: 1100,
+            easing: Easing.inOut(Easing.sin), useNativeDriver: true,
+          }),
+          Animated.timing(starBreath, {
+            toValue: 1.0, duration: 1100,
+            easing: Easing.inOut(Easing.sin), useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }, 1500);
+
+    return () => {
+      [t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11].forEach(clearTimeout);
+      mascotFloat.stopAnimation();
+      sparkleIdleScale.stopAnimation();
+      sparkleIdleRot.stopAnimation();
+      lightningFlicker.stopAnimation();
+      lightningIdleY.stopAnimation();
+      starSpin.stopAnimation();
+      starBreath.stopAnimation();
+    };
   }, []);
+
+  // Entrance interpolations
+  const sparkleRotateStr = sparkleRot.interpolate({
+    inputRange: [-60, 0],
+    outputRange: ["-60deg", "0deg"],
+  });
+  const starRotateStr = starRot.interpolate({
+    inputRange: [0, 120],
+    outputRange: ["0deg", "120deg"],
+  });
+
+  // Idle interpolations
+  const sparkleIdleRotStr = sparkleIdleRot.interpolate({
+    inputRange: [-22, 22],
+    outputRange: ["-22deg", "22deg"],
+  });
+  const starSpinStr = starSpin.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
 
   return (
     <View style={s.container}>
       <StatusBar style="light" />
+
+      {/* Animated background glow */}
+      <Animated.View style={[s.glowWrap, { opacity: glowOpacity }]}>
+        <LinearGradient
+          colors={["rgba(152,16,250,0.22)", "transparent"]}
+          style={s.glow}
+          start={{ x: 1, y: 0 }}
+          end={{ x: 0, y: 1 }}
+        />
+      </Animated.View>
       <LinearGradient
         colors={["#0E0A24", "#080814"]}
         style={StyleSheet.absoluteFillObject}
       />
 
-      {/* Purple glow in top-right corner */}
-      <View style={s.glowWrap}>
-        <LinearGradient
-          colors={["rgba(152,16,250,0.18)", "transparent"]}
-          style={s.glow}
-          start={{ x: 1, y: 0 }}
-          end={{ x: 0, y: 1 }}
-        />
-      </View>
-
-      {/* ── Decorative elements ── */}
-      <View style={s.decorSparkle}>
-        <Icon name="decor-sparkle" size={39} color="#C27AFF" />
-      </View>
-      <View style={s.decorLightning}>
-        <Icon name="decor-lightning" size={34} color="#51A2FF" />
-      </View>
-
-      {/* Close */}
-      <TouchableOpacity
-        style={s.closeBtn}
-        onPress={() => router.back()}
-        hitSlop={12}
+      {/* ── Sparkle — rotates in from top-right, then twinkles + oscillates ── */}
+      <Animated.View
+        style={[
+          s.decorSparkle,
+          {
+            opacity: sparkleFade,
+            transform: [{ scale: sparkleScale }, { rotate: sparkleRotateStr }],
+          },
+        ]}
       >
-        <Icon name="x" size={22} color={Colors.textSecondary} />
-      </TouchableOpacity>
+        {/* Idle layer: independent twinkle scale + rotation oscillation */}
+        <Animated.View
+          style={{
+            transform: [
+              { scale: sparkleIdleScale },
+              { rotate: sparkleIdleRotStr },
+            ],
+          }}
+        >
+          <Icon name="decor-sparkle" size={39} color="#C27AFF" />
+        </Animated.View>
+      </Animated.View>
 
-      {/* ── Center content: mascot + title ── */}
+      {/* ── Lightning — slides in from the left, then electric flicker + zap ── */}
+      <Animated.View
+        style={[
+          s.decorLightning,
+          { opacity: lightningFade, transform: [{ translateX: lightningX }] },
+        ]}
+      >
+        {/* Idle layer: flicker opacity + micro bounce */}
+        <Animated.View
+          style={{
+            opacity: lightningFlicker,
+            transform: [{ translateY: lightningIdleY }],
+          }}
+        >
+          <Icon name="decor-lightning" size={34} color="#51A2FF" />
+        </Animated.View>
+      </Animated.View>
+
+      {/* ── Close button — pops in ── */}
+      <Animated.View
+        style={[
+          s.closeBtnWrap,
+          { opacity: closeFade, transform: [{ scale: closeScale }] },
+        ]}
+      >
+        <TouchableOpacity
+          style={s.closeBtn}
+          onPress={() => router.back()}
+          hitSlop={12}
+        >
+          <Icon name="x" size={22} color={Colors.textSecondary} />
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* ── Center content ── */}
       <View style={s.centerContent}>
-        <Animated.View style={{ opacity: mascotAnim, transform: [{ translateY: slideAnim }] }}>
-          <Mascot size={200} />
+
+        {/* Mascot — hero: bounces up, then floats */}
+        <Animated.View
+          style={{
+            opacity: mascotFade,
+            transform: [
+              { translateY: mascotY },
+              { scale: mascotScale },
+            ],
+          }}
+        >
+          <Animated.View style={{ transform: [{ translateY: mascotFloat }] }}>
+            <Mascot size={200} />
+          </Animated.View>
         </Animated.View>
 
-        <Animated.View style={[s.textSection, { opacity: textAnim }]}>
+        {/* Title — slides up */}
+        <Animated.View
+          style={[
+            s.textSection,
+            { opacity: titleFade, transform: [{ translateY: titleY }] },
+          ]}
+        >
           <GradientText text="C'est parti !" style={s.title} />
+        </Animated.View>
+
+        {/* Subtitle — gentle lift */}
+        <Animated.View
+          style={{
+            opacity: subtitleFade,
+            transform: [{ translateY: subtitleY }],
+          }}
+        >
           <Text style={s.subtitle}>
             C'est le moment de{"\n"}choisir votre plan
           </Text>
         </Animated.View>
 
-        <Animated.View style={{ opacity: ctaAnim, width: "100%" }}>
+        {/* CTA — pops up */}
+        <Animated.View
+          style={[
+            s.ctaArea,
+            {
+              opacity: ctaFade,
+              transform: [{ translateY: ctaY }, { scale: ctaScale }],
+            },
+          ]}
+        >
           <TouchableOpacity
             style={s.ctaWrap}
-            onPress={() => navigate("/paywall/plans")}
+            onPress={() => { hapticHeavy(); navigate("/paywall/plans"); }}
             activeOpacity={0.85}
           >
             <LinearGradient
@@ -126,11 +453,30 @@ export default function PaywallIntroScreen() {
             </LinearGradient>
           </TouchableOpacity>
 
-          {/* Pink star below CTA */}
-          <View style={s.decorStar}>
-            <Icon name="decor-star" size={29} color="#FB64B6" />
-          </View>
+          {/* Star — spins in, then continuously rotates + breathes */}
+          <Animated.View
+            style={[
+              s.decorStar,
+              {
+                opacity: starFade,
+                transform: [{ scale: starScale }, { rotate: starRotateStr }],
+              },
+            ]}
+          >
+            {/* Idle layer: continuous spin + scale breath */}
+            <Animated.View
+              style={{
+                transform: [
+                  { rotate: starSpinStr },
+                  { scale: starBreath },
+                ],
+              }}
+            >
+              <Icon name="decor-star" size={29} color="#FB64B6" />
+            </Animated.View>
+          </Animated.View>
         </Animated.View>
+
       </View>
     </View>
   );
@@ -145,7 +491,7 @@ const s = StyleSheet.create({
     paddingTop: Platform.OS === "ios" ? 56 : 36,
   },
 
-  // Background glow
+  // Background glow (animated wrapper)
   glowWrap: {
     position: "absolute",
     top: 0,
@@ -153,6 +499,7 @@ const s = StyleSheet.create({
     width: SW * 0.7,
     height: SW * 0.7,
     overflow: "hidden",
+    zIndex: 0,
   },
   glow: {
     width: "100%",
@@ -160,18 +507,20 @@ const s = StyleSheet.create({
     borderBottomLeftRadius: SW * 0.35,
   },
 
-  // Close
-  closeBtn: {
+  // Close button
+  closeBtnWrap: {
     position: "absolute",
     top: Platform.OS === "ios" ? 56 : 36,
     left: 20,
+    zIndex: 10,
+  },
+  closeBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
     backgroundColor: Colors.bgCard,
     alignItems: "center",
     justifyContent: "center",
-    zIndex: 10,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
   },
@@ -182,34 +531,32 @@ const s = StyleSheet.create({
     top: "25%",
     right: SW * 0.1,
     zIndex: 5,
-    opacity: 0.7,
   },
   decorLightning: {
     position: "absolute",
     top: "42%",
     left: SW * 0.06,
     zIndex: 5,
-    opacity: 0.6,
   },
   decorStar: {
     alignSelf: "flex-start",
     marginLeft: 50,
-    opacity: 0.7,
+    marginTop: 8,
   },
 
-  // Center content (mascot + text grouped)
+  // Center content
   centerContent: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 20,
+    gap: 16,
+    zIndex: 2,
   },
 
   // Text
   textSection: {
     alignItems: "center",
     paddingHorizontal: 40,
-    gap: 12,
   },
   title: {
     fontFamily: Fonts.black,
@@ -225,17 +572,21 @@ const s = StyleSheet.create({
     lineHeight: 24,
   },
 
+  // CTA area
+  ctaArea: {
+    width: "100%",
+    alignItems: "center",
+  },
   ctaWrap: {
     width: "100%",
     borderRadius: 28,
     overflow: "hidden",
     shadowColor: "#F6339A",
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.4,
     paddingHorizontal: 60,
-
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
   },
   ctaGradient: {
     paddingVertical: 16,

@@ -12,7 +12,7 @@ import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { Colors, Gradients } from "../theme/colors";
 import { Fonts } from "../theme/typography";
-import { KaytiHeader, BottomTabBar } from "../components/ui";
+import { KaytiHeader } from "../components/ui";
 
 const { width } = Dimensions.get("window");
 const COLUMNS = 6;
@@ -149,7 +149,6 @@ export default function AvatarPickerScreen() {
         <View style={{ height: 110 }} />
       </ScrollView>
 
-      <BottomTabBar activeRoute="/(tabs)/profile" />
     </View>
   );
 }

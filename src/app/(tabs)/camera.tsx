@@ -23,6 +23,7 @@ import { AssistantModeModal } from "../../components/camera/AssistantModeModal";
 import { AiTipOverlay } from "../../components/camera/AiTipOverlay";
 import type { AssistantMode } from "../../components/camera/AssistantModeModal";
 import { aiApi } from "../../services/api/ai.api";
+import { hapticLight, hapticMedium } from "../../utils/haptics";
 import { readAsStringAsync, deleteAsync } from "expo-file-system/legacy";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 
@@ -256,6 +257,7 @@ export default function CameraScreen() {
       const frame = await cameraRef.current.takePictureAsync({
         quality: 0.8,
         skipProcessing: false,
+        saveToPhotos: false,
       });
       if (!frame?.uri) return;
 
@@ -323,6 +325,7 @@ export default function CameraScreen() {
 
   const handleCapture = useCallback(async () => {
     if (isCapturing || !cameraRef.current) return;
+    hapticMedium(); // shutter feel
     setIsCapturing(true);
 
     // Animate capture button
@@ -359,6 +362,7 @@ export default function CameraScreen() {
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.9,
         skipProcessing: false,
+        saveToPhotos: false,
       });
       if (photo) {
         // Navigate to analysis result
@@ -375,14 +379,17 @@ export default function CameraScreen() {
   }, [isCapturing, router]);
 
   const toggleFlash = useCallback(() => {
+    hapticLight();
     setFlashEnabled((prev) => !prev);
   }, []);
 
   const toggleFacing = useCallback(() => {
+    hapticLight();
     setFacing((prev) => (prev === "back" ? "front" : "back"));
   }, []);
 
   const toggleGrid = useCallback(() => {
+    hapticLight();
     setShowGrid((prev) => !prev);
   }, []);
 

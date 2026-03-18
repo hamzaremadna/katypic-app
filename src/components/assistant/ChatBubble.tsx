@@ -1,5 +1,5 @@
-import React from "react";
-import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
+import React, { useRef, useEffect } from "react";
+import { View, Text, StyleSheet, Animated } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Icon } from "@components/ui/Icon";
 import { Colors, Gradients } from "@theme/colors";
@@ -14,6 +14,75 @@ function formatTime(isoString: string): string {
     .padStart(2, "0")}`;
 }
 
+// ── Animated typing indicator (3 bouncing dots) ──────────────────────────────
+function TypingDots() {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Each dot has the same 1500ms cycle but starts at a different offset,
+    // producing a staggered wave effect.
+    const animate = (dot: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(dot, {
+            toValue: -6,
+            duration: 280,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot, {
+            toValue: 0,
+            duration: 280,
+            useNativeDriver: true,
+          }),
+          Animated.delay(1000 - delay), // pad to keep cycle = 1560ms
+        ])
+      );
+
+    const a1 = animate(dot1, 0);
+    const a2 = animate(dot2, 200);
+    const a3 = animate(dot3, 400);
+    a1.start();
+    a2.start();
+    a3.start();
+    return () => {
+      a1.stop();
+      a2.stop();
+      a3.stop();
+    };
+  }, []);
+
+  return (
+    <View style={td.row}>
+      {[dot1, dot2, dot3].map((dot, i) => (
+        <Animated.View
+          key={i}
+          style={[td.dot, { transform: [{ translateY: dot }] }]}
+        />
+      ))}
+    </View>
+  );
+}
+
+const td = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.textSecondary,
+  },
+});
+
+// ── Chat bubble list ─────────────────────────────────────────────────────────
 export function ChatBubbleList({
   messages,
   isLoading,
@@ -32,7 +101,10 @@ export function ChatBubbleList({
           >
             {!isUser && (
               <View style={s.aiAvatar}>
-                <LinearGradient colors={Gradients.purpleBlue} style={s.aiAvatarGradient}>
+                <LinearGradient
+                  colors={Gradients.purpleBlue}
+                  style={s.aiAvatarGradient}
+                >
                   <Icon name="sparkles" size={14} color="#FFFFFF" />
                 </LinearGradient>
               </View>
@@ -51,12 +123,16 @@ export function ChatBubbleList({
                   style={s.messageBubbleUser}
                 >
                   <Text style={s.messageText}>{message.content}</Text>
-                  <Text style={s.messageTimestamp}>{formatTime(message.createdAt)}</Text>
+                  <Text style={s.messageTimestamp}>
+                    {formatTime(message.createdAt)}
+                  </Text>
                 </LinearGradient>
               ) : (
                 <View style={s.messageBubbleAI}>
                   <Text style={s.messageText}>{message.content}</Text>
-                  <Text style={s.messageTimestamp}>{formatTime(message.createdAt)}</Text>
+                  <Text style={s.messageTimestamp}>
+                    {formatTime(message.createdAt)}
+                  </Text>
                 </View>
               )}
             </View>
@@ -64,15 +140,19 @@ export function ChatBubbleList({
         );
       })}
 
+      {/* Typing indicator while waiting for AI response */}
       {isLoading && (
         <View style={[s.messageRow, s.messageRowAI]}>
           <View style={s.aiAvatar}>
-            <LinearGradient colors={Gradients.purpleBlue} style={s.aiAvatarGradient}>
+            <LinearGradient
+              colors={Gradients.purpleBlue}
+              style={s.aiAvatarGradient}
+            >
               <Icon name="sparkles" size={14} color="#FFFFFF" />
             </LinearGradient>
           </View>
           <View style={s.messageBubbleAI}>
-            <ActivityIndicator size="small" color={Colors.textSecondary} />
+            <TypingDots />
           </View>
         </View>
       )}

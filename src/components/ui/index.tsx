@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -435,7 +435,9 @@ interface InputFieldProps {
   onChangeText: (t: string) => void;
   icon: IconName;
   secureTextEntry?: boolean;
+  showPasswordToggle?: boolean;
   keyboardType?: KeyboardTypeOptions;
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
   hint?: string;
 }
 
@@ -446,9 +448,14 @@ export function InputField({
   onChangeText,
   icon,
   secureTextEntry,
+  showPasswordToggle,
   keyboardType,
+  autoCapitalize = "none",
   hint,
 }: InputFieldProps) {
+  const [hidden, setHidden] = useState<boolean>(true);
+  const isSecure = secureTextEntry && hidden;
+
   return (
     <View style={inp.wrapper}>
       <Text style={inp.label}>{label}</Text>
@@ -461,10 +468,23 @@ export function InputField({
             placeholderTextColor={Colors.textMuted}
             value={value}
             onChangeText={onChangeText}
-            secureTextEntry={secureTextEntry}
+            secureTextEntry={isSecure}
             keyboardType={keyboardType}
-            autoCapitalize="none"
+            autoCapitalize={autoCapitalize}
           />
+          {secureTextEntry && showPasswordToggle && (
+            <TouchableOpacity
+              onPress={() => setHidden((h) => !h)}
+              hitSlop={10}
+              style={inp.eyeBtn}
+            >
+              <Icon
+                name={hidden ? "eye" : "eye-off"}
+                size={18}
+                color={Colors.textMuted}
+              />
+            </TouchableOpacity>
+          )}
         </LinearGradient>
       </View>
       {hint && <Text style={inp.hint}>{hint}</Text>}
@@ -495,6 +515,9 @@ const inp = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     color: Colors.textPrimary,
+  },
+  eyeBtn: {
+    padding: 2,
   },
   hint: {
     fontFamily: Fonts.regular,
