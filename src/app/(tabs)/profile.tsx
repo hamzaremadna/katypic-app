@@ -155,8 +155,10 @@ export default function ProfileScreen() {
 
   // ── Real photos ──
   const { data: photosData, isLoading: photosLoading } = usePhotos();
-  const userPhotos: Photo[] = photosData?.photos ?? [];
-  const photoCount = photosData?.total ?? 0;
+  const allPhotos: Photo[] = photosData?.photos ?? [];
+  // Profile only shows photos the user has explicitly made public
+  const userPhotos: Photo[] = allPhotos.filter((p) => p.isPublic);
+  const photoCount = userPhotos.length;
 
   const displayName = profile?.displayName ?? authUser?.username ?? "Photographe";
   const bio = profile?.bio ?? "Passionné de photographie.";
@@ -179,8 +181,8 @@ export default function ProfileScreen() {
   );
 
   const analysesCount = useMemo(
-    () => userPhotos.filter((p) => (p.analyses?.length ?? 0) > 0).length,
-    [userPhotos],
+    () => allPhotos.filter((p) => (p.analyses?.length ?? 0) > 0).length,
+    [allPhotos],
   );
 
   const handleGoToEditProfile = useCallback(() => {

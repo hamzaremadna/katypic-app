@@ -24,6 +24,7 @@ import {
 } from "../../hooks/usePhotoAnalysis";
 import { hapticMedium, hapticSuccess, hapticError } from "../../utils/haptics";
 import { useUploadPhoto } from "../../hooks/useUploadPhoto";
+import { useUpdatePhoto } from "../../hooks/usePhotos";
 
 const { width } = Dimensions.get("window");
 
@@ -320,6 +321,11 @@ export default function AnalyseResultScreen() {
   // ── Mutations ──
   const uploadPhoto = useUploadPhoto();
   const analyzePhoto = useAnalyzePhoto();
+  const updatePhoto = useUpdatePhoto();
+
+  // ── "Add to profile" state ──
+  const [addedToProfile, setAddedToProfile] = useState(false);
+  const [addingToProfile, setAddingToProfile] = useState(false);
 
   // ── Fetch existing analysis (when photoId is known) ──
   const {
@@ -641,6 +647,55 @@ export default function AnalyseResultScreen() {
           </View>
         )}
 
+        {/* Add to profile CTA */}
+        <View style={s.profileCtaContainer}>
+          {addedToProfile ? (
+            <View style={s.profileCtaSuccess}>
+              <Icon name="check" size={18} color={Colors.accentGreen} />
+              <Text style={s.profileCtaSuccessText}>Ajoutée à ton profil !</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[s.profileCtaBtn, addingToProfile && { opacity: 0.7 }]}
+              activeOpacity={0.85}
+              disabled={addingToProfile || !resolvedPhotoId}
+              onPress={async () => {
+                if (!resolvedPhotoId) return;
+                setAddingToProfile(true);
+                try {
+                  await updatePhoto.mutateAsync({
+                    photoId: resolvedPhotoId,
+                    data: { isPublic: true },
+                  });
+                  hapticSuccess();
+                  setAddedToProfile(true);
+                } catch {
+                  hapticError();
+                  Alert.alert("Erreur", "Impossible d'ajouter la photo au profil. Réessayez.");
+                } finally {
+                  setAddingToProfile(false);
+                }
+              }}
+            >
+              <LinearGradient
+                colors={Gradients.brand}
+                style={s.profileCtaBtnGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                {addingToProfile ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Icon name="user" size={18} color="#fff" />
+                    <Text style={s.profileCtaBtnText}>Ajouter à mon profil</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* CTA Button */}
         <View style={s.ctaContainer}>
           <GradientButton
@@ -813,6 +868,41 @@ const s = StyleSheet.create({
   feedbackHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
   feedbackDot: { width: 8, height: 8, borderRadius: 4 },
   feedbackList: { gap: 10 },
+
+  profileCtaContainer: { marginTop: 4 },
+  profileCtaBtn: {
+    borderRadius: 50,
+    overflow: "hidden",
+    shadowColor: Colors.gradientPurple,
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
+  },
+  profileCtaBtnGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
+    gap: 10,
+  },
+  profileCtaBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  profileCtaSuccess: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 16,
+    backgroundColor: "rgba(0,200,81,0.1)",
+    borderRadius: 50,
+    borderWidth: 1,
+    borderColor: "rgba(0,200,81,0.25)",
+  },
+  profileCtaSuccessText: {
+    color: Colors.accentGreen,
+    fontSize: 15,
+    fontWeight: "700",
+  },
 
   ctaContainer: { marginTop: 4 },
 

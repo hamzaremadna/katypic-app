@@ -59,6 +59,9 @@ export const photoApi = {
 
   get: (photoId: string) => api.get<Photo>(`/photos/${photoId}`),
 
+  update: (photoId: string, data: { isPublic?: boolean; caption?: string }) =>
+    api.patch<Photo>(`/photos/${photoId}`, data),
+
   delete: (photoId: string) => api.delete(`/photos/${photoId}`),
 
   /** Multipart file upload for local dev mode */

@@ -16,6 +16,22 @@ export function usePhoto(photoId: string) {
   });
 }
 
+export function useUpdatePhoto() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      photoId,
+      data,
+    }: {
+      photoId: string;
+      data: { isPublic?: boolean; caption?: string };
+    }) => photoApi.update(photoId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["photos"] });
+    },
+  });
+}
+
 export function useDeletePhoto() {
   const queryClient = useQueryClient();
   return useMutation({
