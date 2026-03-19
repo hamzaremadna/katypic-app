@@ -388,7 +388,7 @@ export default function HomeScreen() {
   const handleCloseConseil = useCallback(() => setShowConseil(false), []);
   const handleTryConseil = useCallback(() => {
     setShowConseil(false);
-    router.push("/(tabs)/assistant");
+    router.push("/(tabs)/camera");
   }, [router]);
   const handleGoToGallery = useCallback(
     () => router.push("/(tabs)/gallery"),
