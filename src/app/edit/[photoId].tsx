@@ -18,6 +18,12 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as MediaLibrary from "expo-media-library";
 import * as Sharing from "expo-sharing";
+import ViewShot from "react-native-view-shot";
+import {
+  Brightness,
+  Contrast,
+  Saturate,
+} from "react-native-color-matrix-image-filters";
 import { Colors, Gradients } from "../../theme/colors";
 import { Fonts } from "../../theme/typography";
 import { KaytiHeader } from "../../components/ui";
@@ -170,23 +176,22 @@ function PresetPill({ preset, isSelected, onPress }: { preset: PresetDef; isSele
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={pl.wrapper}>
       {isSelected ? (
-        <LinearGradient colors={Gradients.brand} style={pl.container} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+        <LinearGradient colors={Gradients.brand} style={pl.circle} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
           <Icon name={preset.icon} size={22} color={Colors.textPrimary} />
-          <Text style={[pl.label, pl.labelActive]}>{preset.label}</Text>
         </LinearGradient>
       ) : (
-        <View style={[pl.container, pl.inactive]}>
+        <View style={[pl.circle, pl.inactive]}>
           <Icon name={preset.icon} size={22} color={Colors.textSecondary} />
-          <Text style={pl.label}>{preset.label}</Text>
         </View>
       )}
+      <Text style={[pl.label, isSelected && pl.labelActive]}>{preset.label}</Text>
     </TouchableOpacity>
   );
 }
 
 const pl = StyleSheet.create({
-  wrapper: { borderRadius: 16, overflow: "hidden" },
-  container: { alignItems: "center", justifyContent: "center", paddingVertical: 14, paddingHorizontal: 18, borderRadius: 16, gap: 6, minWidth: 80 },
+  wrapper: { alignItems: "center", gap: 6, marginHorizontal: 4 },
+  circle: { width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center" },
   inactive: { backgroundColor: Colors.bgCard, borderWidth: 1, borderColor: Colors.cardBorder },
   label: { fontSize: 11, fontFamily: Fonts.semibold, color: Colors.textSecondary },
   labelActive: { color: Colors.textPrimary, fontFamily: Fonts.bold },
@@ -200,14 +205,17 @@ function RatioItem({ item, isSelected, onPress }: { item: AspectRatio; isSelecte
     <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={rt.wrapper}>
       {isSelected ? (
         <LinearGradient colors={Gradients.brand} style={rt.card} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+          <View style={rt.checkBadge}>
+            <Icon name="check" size={10} color="#fff" />
+          </View>
           <Icon name={item.icon} size={20} color={Colors.textPrimary} />
-          <Text style={[rt.label, rt.labelActive]}>{item.label}</Text>
+          <Text style={[item.sublabel ? rt.label : rt.labelSmall, rt.labelActive]}>{item.label}</Text>
           {item.sublabel !== "" && <Text style={[rt.sublabel, rt.sublabelActive]}>{item.sublabel}</Text>}
         </LinearGradient>
       ) : (
         <View style={[rt.card, rt.inactive]}>
           <Icon name={item.icon} size={20} color={Colors.textSecondary} />
-          <Text style={rt.label}>{item.label}</Text>
+          <Text style={item.sublabel ? rt.label : rt.labelSmall}>{item.label}</Text>
           {item.sublabel !== "" && <Text style={rt.sublabel}>{item.sublabel}</Text>}
         </View>
       )}
@@ -216,10 +224,17 @@ function RatioItem({ item, isSelected, onPress }: { item: AspectRatio; isSelecte
 }
 
 const rt = StyleSheet.create({
-  wrapper: { width: (width - 40 - 20) / 3, borderRadius: 16, overflow: "hidden" },
-  card: { height: 80, borderRadius: 16, alignItems: "center", justifyContent: "center", gap: 2 },
+  wrapper: { width: "30%", borderRadius: 16, overflow: "hidden" },
+  card: { height: 90, borderRadius: 16, alignItems: "center", justifyContent: "center", gap: 4, position: "relative" },
   inactive: { backgroundColor: Colors.bgCard, borderWidth: 1, borderColor: Colors.cardBorder },
+  checkBadge: {
+    position: "absolute", top: 6, right: 6,
+    width: 18, height: 18, borderRadius: 9,
+    backgroundColor: "rgba(255,255,255,0.25)",
+    alignItems: "center", justifyContent: "center",
+  },
   label: { fontSize: 15, fontFamily: Fonts.bold, color: Colors.textSecondary },
+  labelSmall: { fontSize: 12, fontFamily: Fonts.bold, color: Colors.textSecondary },
   labelActive: { color: Colors.textPrimary },
   sublabel: { fontSize: 11, color: Colors.textMuted, fontFamily: Fonts.medium },
   sublabelActive: { color: "rgba(255,255,255,0.7)" },
@@ -256,11 +271,17 @@ export default function RetoucheScreen() {
 
   const [exporting, setExporting] = useState(false);
   const intensityRef = useRef<View>(null);
+  const viewShotRef = useRef<ViewShot>(null);
   const tabAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.spring(tabAnim, { toValue: activeTab === "ajuster" ? 0 : 1, tension: 80, friction: 10, useNativeDriver: true }).start();
   }, [activeTab]);
+
+  // Convert adjustment values [-100,100] to filter multipliers
+  const brightnessAmount = 1 + (adjustments.exposition ?? 0) / 100 + (adjustments.luminosite ?? 0) / 200;
+  const contrastAmount = 1 + (adjustments.contraste ?? 0) / 100;
+  const saturationAmount = 1 + (adjustments.saturation ?? 0) / 100;
 
   const tabTranslate = tabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, (width - 40) / 2] });
 
@@ -338,16 +359,22 @@ export default function RetoucheScreen() {
     if (!photoUri) return;
     setExporting(true);
     try {
+      // 1. Capture the preview (includes color filters: brightness, contrast, saturation)
+      let sourceUri = photoUri;
+      if (viewShotRef.current?.capture) {
+        sourceUri = await viewShotRef.current.capture();
+      }
+
+      // 2. Apply geometric transforms (rotation, flip, crop) via ImageManipulator
       const actions: ImageManipulator.Action[] = [];
       if (rotation !== 0) actions.push({ rotate: rotation });
       if (flipH) actions.push({ flip: ImageManipulator.FlipType.Horizontal });
       if (flipV) actions.push({ flip: ImageManipulator.FlipType.Vertical });
 
-      // Crop to selected ratio
       const ratioObj = ASPECT_RATIOS.find((r) => r.key === selectedRatio);
       if (ratioObj?.ratio) {
         const dims = await new Promise<{ width: number; height: number }>((res, rej) => {
-          Image.getSize(photoUri, (w, h) => res({ width: w, height: h }), rej);
+          Image.getSize(sourceUri, (w, h) => res({ width: w, height: h }), rej);
         });
         const target = ratioObj.ratio;
         const imgR = dims.width / dims.height;
@@ -357,7 +384,10 @@ export default function RetoucheScreen() {
         actions.push({ crop: { originX: Math.round((dims.width - cw) / 2), originY: Math.round((dims.height - ch) / 2), width: cw, height: ch } });
       }
 
-      const result = await ImageManipulator.manipulateAsync(photoUri, actions, { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG });
+      const result = actions.length > 0
+        ? await ImageManipulator.manipulateAsync(sourceUri, actions, { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG })
+        : { uri: sourceUri };
+
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status === "granted") {
         await MediaLibrary.saveToLibraryAsync(result.uri);
@@ -371,7 +401,7 @@ export default function RetoucheScreen() {
     } finally {
       setExporting(false);
     }
-  }, [photoUri, rotation, flipH, flipV, selectedRatio]);
+  }, [photoUri, rotation, flipH, flipV, selectedRatio, adjustments]);
 
   const handleShare = useCallback(async () => {
     if (!savedUri) return;
@@ -470,21 +500,27 @@ export default function RetoucheScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={es.scroll}>
-        {/* Photo Preview */}
-        <View style={es.photoWrap}>
+        {/* Photo Preview with live color adjustments */}
+        <ViewShot ref={viewShotRef} options={{ format: "jpg", quality: 0.9 }} style={es.photoWrap}>
           {photoUri ? (
-            <Image
-              source={{ uri: photoUri }}
-              style={[es.photo, { transform: [{ rotate: `${rotation}deg` }, { scaleX: flipH ? -1 : 1 }, { scaleY: flipV ? -1 : 1 }] }]}
-              resizeMode="contain"
-            />
+            <Brightness amount={brightnessAmount}>
+              <Contrast amount={contrastAmount}>
+                <Saturate amount={saturationAmount}>
+                  <Image
+                    source={{ uri: photoUri }}
+                    style={[es.photo, { transform: [{ rotate: `${rotation}deg` }, { scaleX: flipH ? -1 : 1 }, { scaleY: flipV ? -1 : 1 }] }]}
+                    resizeMode="contain"
+                  />
+                </Saturate>
+              </Contrast>
+            </Brightness>
           ) : (
             <LinearGradient colors={["#2D1060", "#1A0840"]} style={es.photoEmpty}>
               <Icon name="image" size={48} color={Colors.textMuted} />
               <Text style={es.photoEmptyText}>Aperçu de la photo</Text>
             </LinearGradient>
           )}
-        </View>
+        </ViewShot>
 
         {/* Reset + AI Button */}
         <View style={es.aiRow}>
@@ -682,9 +718,9 @@ const es = StyleSheet.create({
   tabActive: { color: "#fff", fontFamily: Fonts.bold },
 
   // Photo
-  photoWrap: { marginHorizontal: 20, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: Colors.cardBorder, height: 280, backgroundColor: "#0A0A14" },
-  photo: { width: "100%", height: 280, borderRadius: 16 },
-  photoEmpty: { width: "100%", height: 280, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  photoWrap: { marginHorizontal: 12, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: Colors.cardBorder, height: 360, backgroundColor: "#0A0A14" },
+  photo: { width: "100%", height: 360, borderRadius: 16 },
+  photoEmpty: { width: "100%", height: 360, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   photoEmptyText: { fontSize: 14, color: Colors.textMuted, fontFamily: Fonts.semibold },
 
   // AI Row
@@ -735,7 +771,7 @@ const es = StyleSheet.create({
 
   // Ratio
   ratioSection: { paddingHorizontal: 20 },
-  ratioGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  ratioGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "space-between" },
 
   // Free crop
   freeCrop: { marginHorizontal: 20, borderRadius: 16, backgroundColor: Colors.bgCard, borderWidth: 1, borderColor: Colors.cardBorder },
