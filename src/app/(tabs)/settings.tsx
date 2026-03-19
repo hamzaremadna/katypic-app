@@ -23,6 +23,7 @@ import { Icon, type IconName } from "../../components/ui/Icon";
 import { useAuthStore } from "../../stores/authStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { profileApi } from "../../services/api/profile.api";
+import { authApi } from "../../services/api/auth.api";
 
 // ─── Constants ────────────────────────────────────────────
 const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
@@ -148,35 +149,35 @@ export default function SettingsScreen() {
         {
           text: "Supprimer",
           style: "destructive",
-          onPress: () => {
-            Alert.alert(
-              "Demande envoyée",
-              "Pour supprimer votre compte, envoyez un email à privacy@kaytipic.com. Votre compte sera supprimé sous 48h.",
-              [
-                { text: "Fermer", style: "cancel" },
-                {
-                  text: "Envoyer l'email",
-                  onPress: () =>
-                    Linking.openURL(
-                      "mailto:privacy@kaytipic.com?subject=Suppression%20de%20compte&body=Je%20souhaite%20supprimer%20mon%20compte%20KaytiPic."
-                    ),
-                },
-              ]
-            );
+          onPress: async () => {
+            try {
+              await authApi.deleteAccount();
+              await logout();
+              router.replace("/(auth)/login");
+            } catch {
+              Alert.alert("Erreur", "Impossible de supprimer le compte. Réessayez plus tard.");
+            }
           },
         },
       ]
     );
-  }, []);
+  }, [logout, router]);
 
-  const handleRateApp = useCallback(() => {
-    const iosUrl = "https://apps.apple.com/app/kaytipic/id0000000000";
-    const androidUrl =
-      "https://play.google.com/store/apps/details?id=com.kaytipic.app";
-    const url = Platform.OS === "ios" ? iosUrl : androidUrl;
-    Linking.openURL(url).catch(() =>
-      Alert.alert("Erreur", "Impossible d'ouvrir le store.")
-    );
+  const handleRateApp = useCallback(async () => {
+    try {
+      const StoreReview = await import("expo-store-review");
+      if (await StoreReview.isAvailableAsync()) {
+        await StoreReview.requestReview();
+      } else {
+        // Fallback to store URL
+        const url = Platform.OS === "ios"
+          ? "https://apps.apple.com/app/kaytipic/id0000000000"
+          : "https://play.google.com/store/apps/details?id=com.kaytipic.app";
+        Linking.openURL(url);
+      }
+    } catch {
+      Alert.alert("Erreur", "Impossible d'ouvrir le store.");
+    }
   }, []);
 
   const handlePasswordReset = useCallback(() => {

@@ -30,7 +30,7 @@ export interface PhotoAnalysis {
   colorFeedback: string;
   technicalFeedback: string;
   suggestions: string[];
-  annotations: any[];
+  annotations: unknown[];
 }
 
 export const photoApi = {

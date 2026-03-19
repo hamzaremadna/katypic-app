@@ -20,4 +20,7 @@ export const authApi = {
 
   requestPasswordReset: (email: string) =>
     apiClient.post<{ message: string }>("/auth/request-password-reset", { email }),
+
+  deleteAccount: () =>
+    apiClient.delete<{ message: string }>("/users/me"),
 };

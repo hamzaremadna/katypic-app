@@ -1,4 +1,5 @@
 import { api } from "./client";
+import type { Photo } from "./photo.api";
 
 export interface Profile {
   id: string;
@@ -37,7 +38,7 @@ export const profileApi = {
   }) => api.patch<Profile>("/profiles/me", data),
 
   getPublicProfile: (userId: string) =>
-    api.get<{ profile: Profile; photos: any[]; creativeProfile: CreativeProfile | null }>(`/profiles/${userId}`),
+    api.get<{ profile: Profile; photos: Photo[]; creativeProfile: CreativeProfile | null }>(`/profiles/${userId}`),
 
   saveCreativeProfile: (data: {
     musicPreferences: string[];

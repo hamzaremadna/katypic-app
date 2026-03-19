@@ -184,17 +184,7 @@ export default function ChatScreen() {
               <Icon name="camera" size={18} color="#fff" />
             </LinearGradient>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={s.inputIconPlain}
-            onPress={() =>
-              Alert.alert(
-                "Bientôt disponible",
-                "L'envoi d'images dans le chat sera disponible prochainement."
-              )
-            }
-          >
-            <Icon name="image" size={18} color={Colors.textPrimary} />
-          </TouchableOpacity>
+          {/* Image sending — hidden until implemented */}
           <View style={s.textInputWrap}>
             <TextInput
               style={s.textInput}

@@ -10,9 +10,11 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { Colors, Gradients } from "../theme/colors";
 import { Fonts } from "../theme/typography";
 import { KaytiHeader } from "../components/ui";
+import { profileApi } from "../services/api/profile.api";
 
 const { width } = Dimensions.get("window");
 const COLUMNS = 6;
@@ -79,11 +81,20 @@ const EMOJIS = [
 // ─── Main Screen ─────────────────────────────────────────
 export default function AvatarPickerScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [selected, setSelected] = useState<string | null>("👱");
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    // TODO: Save avatar to profile via API
-    router.back();
+  const handleSave = async () => {
+    if (!selected || saving) return;
+    setSaving(true);
+    try {
+      await profileApi.updateProfile({ coachAvatar: selected });
+      queryClient.invalidateQueries({ queryKey: ["profile", "me"] });
+      router.back();
+    } catch {
+      setSaving(false);
+    }
   };
 
   return (
