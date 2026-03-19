@@ -15,6 +15,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import * as MediaLibrary from "expo-media-library";
 import { Colors, Gradients } from "../../theme/colors";
 import { KaytiHeader, GradientButton } from "../../components/ui";
 import { Icon, IconName } from "../../components/ui/Icon";
@@ -731,12 +732,21 @@ export default function AnalyseResultScreen() {
           <TouchableOpacity
             style={s.actionBtn}
             activeOpacity={0.7}
-            onPress={() =>
-              Alert.alert(
-                "Bientôt disponible",
-                "La sauvegarde des analyses sera disponible prochainement.",
-              )
-            }
+            onPress={async () => {
+              try {
+                const { status } = await MediaLibrary.requestPermissionsAsync();
+                if (status !== "granted") {
+                  Alert.alert("Permission requise", "Autorisez l'accès à la galerie pour sauvegarder.");
+                  return;
+                }
+                const uri = displayUri;
+                if (!uri) { Alert.alert("Erreur", "Aucune photo à sauvegarder."); return; }
+                await MediaLibrary.saveToLibraryAsync(uri);
+                Alert.alert("Sauvegardé !", "La photo a été enregistrée dans votre galerie.");
+              } catch {
+                Alert.alert("Erreur", "Impossible de sauvegarder la photo.");
+              }
+            }}
           >
             <View style={s.actionBtnBg}>
               <Icon name="download" size={20} color={Colors.textPrimary} />

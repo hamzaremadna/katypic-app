@@ -141,12 +141,13 @@ export default function CreateEventScreen() {
       await eventApi.create({
         title: title.trim(),
         description: description.trim(),
-        latitude: 48.8566, // Paris (default — no geolocation in MVP)
+        latitude: 48.8566,
         longitude: 2.3522,
         address: location.trim() || undefined,
         startsAt: startsAt.toISOString(),
         endsAt: endsAt.toISOString(),
         maxParticipants: maxParticipants ? Number(maxParticipants) : undefined,
+        level: (level === "all" ? "ALL_LEVELS" : level.toUpperCase()) as "BEGINNER" | "ALL_LEVELS" | "INTERMEDIATE" | "ADVANCED",
       });
       Alert.alert("Événement créé !", "Votre événement a été publié.", [
         { text: "OK", onPress: () => navigateReplace("/activites") },

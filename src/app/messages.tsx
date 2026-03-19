@@ -216,20 +216,7 @@ export default function MessagesScreen() {
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[s.filterTab, activeTab === "general" && s.filterTabActive]}
-          onPress={() => setActiveTab("general")}
-        >
-          <View style={s.filterDot} />
-          <Text
-            style={[
-              s.filterTabText,
-              activeTab === "general" && s.filterTabTextActive,
-            ]}
-          >
-            Général
-          </Text>
-        </TouchableOpacity>
+        {/* Général tab hidden until group chat is implemented */}
       </View>
 
       {/* List / States */}

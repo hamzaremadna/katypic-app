@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Share,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
@@ -213,7 +214,10 @@ export default function EventDetailScreen() {
                 <Text style={[s.levelBadgeText, { color: levelColor }]}>{levelLabel}</Text>
               </View>
               <View style={s.coverActions}>
-                <TouchableOpacity style={s.coverActionBtn}>
+                <TouchableOpacity
+                  style={s.coverActionBtn}
+                  onPress={() => Share.share({ message: `${event.title} — événement sur KaytiPic` })}
+                >
                   <Icon name="share" size={18} color={Colors.textPrimary} />
                 </TouchableOpacity>
                 <TouchableOpacity

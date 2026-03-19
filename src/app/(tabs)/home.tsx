@@ -22,6 +22,7 @@ import { useRouter } from "expo-router";
 import { navigate } from "@/utils/navigation";
 import { useAuthStore } from "../../stores/authStore";
 import { usePhotos } from "../../hooks/usePhotos";
+import { useQuestPaths } from "../../hooks/useQuestPaths";
 import { useDailyTip } from "../../hooks/useDailyTip";
 
 // Card background images
@@ -344,11 +345,18 @@ export default function HomeScreen() {
       photosData?.photos?.filter((p) => (p.analyses?.length ?? 0) > 0).length ?? 0,
     [photosData?.photos],
   );
-  // Quest milestones: photo-based progression
-  const QUEST_TOTAL = 12;
-  const questCompleted = Math.min(analyzedPhotos, QUEST_TOTAL);
+  // Quest progress from real backend data
+  const { data: questPaths } = useQuestPaths();
+  const questTotal = useMemo(
+    () => questPaths?.reduce((sum, p) => sum + (p.totalCount ?? 0), 0) ?? 0,
+    [questPaths],
+  );
+  const questCompleted = useMemo(
+    () => questPaths?.reduce((sum, p) => sum + (p.completedCount ?? 0), 0) ?? 0,
+    [questPaths],
+  );
   const questPercent =
-    QUEST_TOTAL > 0 ? Math.round((questCompleted / QUEST_TOTAL) * 100) : 0;
+    questTotal > 0 ? Math.round((questCompleted / questTotal) * 100) : 0;
 
   useEffect(() => {
     Animated.timing(headerFade, {
@@ -468,7 +476,7 @@ export default function HomeScreen() {
         <Animated.View style={[s.questCard, { opacity: headerFade }]}>
           <Text style={s.questTitle}>Progression des quêtes</Text>
           <Text style={s.questSub}>
-            {questCompleted} sur {QUEST_TOTAL} complétées
+            {questCompleted} sur {questTotal} complétées
           </Text>
           <View style={s.questBar}>
             <LinearGradient
@@ -483,7 +491,7 @@ export default function HomeScreen() {
             <Text style={s.questHint}>
               {totalPhotos === 0
                 ? "Prenez votre première photo !"
-                : analyzedPhotos < QUEST_TOTAL
+                : analyzedPhotos < questTotal
                 ? "Analysez plus de photos pour progresser"
                 : "Toutes les quêtes sont complétées !"}
             </Text>

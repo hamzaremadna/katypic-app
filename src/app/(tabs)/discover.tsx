@@ -12,6 +12,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Icon } from "../../components/ui/Icon";
 import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
+import * as Location from "expo-location";
 import { Colors, Gradients } from "../../theme/colors";
 import { Fonts } from "../../theme/typography";
 import { KaytiHeader, BottomTabBar } from "../../components/ui";
@@ -21,6 +22,7 @@ import { useQuery } from "@tanstack/react-query";
 import { TourOverlay } from "../../components/tour/TourOverlay";
 import { TOUR_DISCOVER } from "../../data/tours";
 import { useTourStore } from "../../stores/tourStore";
+import { useToggleFavorite } from "../../hooks/useSpots";
 import { spotApi, Spot as ApiSpot } from "../../services/api/spot.api";
 import { eventApi, Event as ApiEvent } from "../../services/api/event.api";
 
@@ -70,12 +72,12 @@ interface CardItem {
   date?: string; // events only
 }
 
-function spotToCard(s: ApiSpot, idx: number): CardItem {
+function spotToCard(s: ApiSpot, idx: number, userLoc: { lat: number; lng: number }): CardItem {
   return {
     id: s.id,
     name: s.name,
     rating: s.averageRating ?? 4.5,
-    distance: distanceKm(PARIS.lat, PARIS.lng, s.latitude, s.longitude),
+    distance: distanceKm(userLoc.lat, userLoc.lng, s.latitude, s.longitude),
     description: s.description ?? "",
     views: s.visitCount,
     image: s.thumbnailUrl ?? `https://picsum.photos/seed/spot${idx}/200/200`,
@@ -84,12 +86,12 @@ function spotToCard(s: ApiSpot, idx: number): CardItem {
   };
 }
 
-function eventToCard(e: ApiEvent, idx: number): CardItem {
+function eventToCard(e: ApiEvent, idx: number, userLoc: { lat: number; lng: number }): CardItem {
   return {
     id: e.id,
     name: e.title,
     rating: 4.5,
-    distance: distanceKm(PARIS.lat, PARIS.lng, e.latitude, e.longitude),
+    distance: distanceKm(userLoc.lat, userLoc.lng, e.latitude, e.longitude),
     description: e.description ?? "",
     views: e._count?.members ?? 0,
     image: e.coverImageUrl ?? `https://picsum.photos/seed/event${idx}/200/200`,
@@ -128,6 +130,19 @@ export default function DiscoverScreen() {
   const mapRef = useRef<MapView>(null);
   const [mapType, setMapType] = useState<"standard" | "satellite">("standard");
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
+  const [userLocation, setUserLocation] = useState(PARIS);
+  const toggleFavorite = useToggleFavorite();
+
+  // ── GPS location ────────────────────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === "granted") {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        setUserLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+      }
+    })();
+  }, []);
 
   // ── Tour ──────────────────────────────────────────────────────────────────
   const { markSeen, load } = useTourStore();
@@ -152,14 +167,14 @@ export default function DiscoverScreen() {
   });
 
   const { data: rawEvents = [], isLoading: eventsLoading } = useQuery({
-    queryKey: ["events", "location"],
+    queryKey: ["events", "location", userLocation.lat, userLocation.lng],
     queryFn: () =>
-      eventApi.listByLocation(PARIS.lat, PARIS.lng, 500).then((r) => r.data),
+      eventApi.listByLocation(userLocation.lat, userLocation.lng, 500).then((r) => r.data),
     staleTime: 5 * 60 * 1000,
   });
 
-  const spots = useMemo(() => rawSpots.map(spotToCard), [rawSpots]);
-  const events = useMemo(() => rawEvents.map(eventToCard), [rawEvents]);
+  const spots = useMemo(() => rawSpots.map((s, i) => spotToCard(s, i, userLocation)), [rawSpots, userLocation]);
+  const events = useMemo(() => rawEvents.map((e, i) => eventToCard(e, i, userLocation)), [rawEvents, userLocation]);
 
   const currentData = activeTab === "spots" ? spots : events;
   const isLoading = activeTab === "spots" ? spotsLoading : eventsLoading;
@@ -228,7 +243,11 @@ export default function DiscoverScreen() {
       next.has(currentItem.id) ? next.delete(currentItem.id) : next.add(currentItem.id);
       return next;
     });
-  }, [currentItem]);
+    // Persist to backend (spots only)
+    if (activeTab === "spots") {
+      toggleFavorite.mutate(currentItem.id);
+    }
+  }, [currentItem, activeTab, toggleFavorite]);
 
   const handleGoToActivites = useCallback(() => {
     navigate("/activites");

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Dimensions,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
@@ -284,8 +285,8 @@ const biStyles = StyleSheet.create({
 // ─── Main Screen ──────────────────────────────────────────
 export default function QuestsScreen() {
   const router = useRouter();
-  const { data: pathsData, isLoading: pathsLoading } = useQuestPaths();
-  const { data: stats, isLoading: statsLoading } = useQuestStats();
+  const { data: pathsData, isLoading: pathsLoading, isError: pathsError, refetch: refetchPaths } = useQuestPaths();
+  const { data: stats, isLoading: statsLoading, isError: statsError, refetch: refetchStats } = useQuestStats();
 
   const isLoading = pathsLoading || statsLoading;
 
@@ -361,6 +362,28 @@ export default function QuestsScreen() {
     );
   }
 
+  if (pathsError || statsError) {
+    return (
+      <View style={[s.container, s.centered]}>
+        <StatusBar style="light" />
+        <LinearGradient
+          colors={["#0E0A24", "#080814"]}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <Icon name="zap" size={40} color={Colors.textMuted} />
+        <Text style={{ color: Colors.textMuted, fontSize: 15, marginTop: 12 }}>
+          Impossible de charger les quêtes
+        </Text>
+        <TouchableOpacity
+          style={{ marginTop: 16, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 20, borderWidth: 1, borderColor: Colors.cardBorder }}
+          onPress={() => { refetchPaths(); refetchStats(); }}
+        >
+          <Text style={{ color: Colors.textSecondary, fontSize: 14 }}>Réessayer</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={s.container}>
       <StatusBar style="light" />
@@ -372,6 +395,13 @@ export default function QuestsScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={false}
+            onRefresh={() => { refetchPaths(); refetchStats(); }}
+            tintColor="#4A90E2"
+          />
+        }
       >
         <KaytiHeader showBack title="Quêtes & Progression" />
 

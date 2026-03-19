@@ -9,6 +9,7 @@ import {
   Image,
   Share,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
@@ -154,7 +155,7 @@ export default function ProfileScreen() {
   });
 
   // ── Real photos ──
-  const { data: photosData, isLoading: photosLoading } = usePhotos();
+  const { data: photosData, isLoading: photosLoading, refetch: refetchPhotos } = usePhotos();
   const allPhotos: Photo[] = photosData?.photos ?? [];
   // Profile only shows photos the user has explicitly made public
   const userPhotos: Photo[] = allPhotos.filter((p) => p.isPublic);
@@ -210,7 +211,17 @@ export default function ProfileScreen() {
       <StatusBar style="light" />
       <LinearGradient colors={["#0E0A24", "#080814"]} style={StyleSheet.absoluteFillObject} />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={s.scroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={false}
+            onRefresh={() => refetchPhotos()}
+            tintColor={Colors.accentPurple}
+          />
+        }
+      >
         <KaytiHeader showBack title="Mon profil" />
 
         {/* ── Profile header ── */}

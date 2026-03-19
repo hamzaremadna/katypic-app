@@ -10,6 +10,7 @@ import {
   Share,
   Alert,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -273,6 +274,9 @@ export default function GalleryScreen() {
           windowSize={5}
           removeClippedSubviews
           getItemLayout={getPhotoLayout}
+          refreshControl={
+            <RefreshControl refreshing={false} onRefresh={refetch} tintColor={Colors.accentPurple} />
+          }
         />
       )}
 
