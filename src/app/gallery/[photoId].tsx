@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,10 @@ import {
   Dimensions,
   Share,
   Alert,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
@@ -17,8 +21,187 @@ import { Fonts } from "../../theme/typography";
 import { KaytiHeader } from "../../components/ui";
 import { Icon } from "../../components/ui/Icon";
 import { useDeletePhoto } from "../../hooks/usePhotos";
+import { hapticLight, hapticMedium, hapticHeavy } from "../../utils/haptics";
 
 const { width, height } = Dimensions.get("window");
+
+// ─── Share caption modal ──────────────────────────────────────────────────────
+
+interface ShareModalProps {
+  visible: boolean;
+  photoUri: string;
+  onClose: () => void;
+}
+
+function ShareCaptionModal({ visible, photoUri, onClose }: ShareModalProps) {
+  const [caption, setCaption] = useState("");
+  const [isSending, setIsSending] = useState(false);
+
+  const handleConfirmShare = async () => {
+    hapticMedium();
+    setIsSending(true);
+    try {
+      const message = caption.trim()
+        ? `${caption.trim()}\n\nDécouvrez KaytiPic !`
+        : "Découvrez cette photo sur KaytiPic !";
+      await Share.share({ message, url: photoUri });
+    } catch {
+      // user cancelled
+    } finally {
+      setIsSending(false);
+      setCaption("");
+      onClose();
+    }
+  };
+
+  const handleClose = () => {
+    hapticLight();
+    setCaption("");
+    onClose();
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
+      <KeyboardAvoidingView
+        style={sm.backdrop}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={handleClose} />
+        <View style={sm.sheet}>
+          <LinearGradient colors={["#0E0A24", "#080814"]} style={StyleSheet.absoluteFillObject} />
+
+          {/* Handle */}
+          <View style={sm.handle} />
+
+          <Text style={sm.title}>Partager la photo</Text>
+
+          {/* Photo thumbnail */}
+          {photoUri ? (
+            <Image source={{ uri: photoUri }} style={sm.thumb} resizeMode="cover" />
+          ) : null}
+
+          {/* Caption input */}
+          <Text style={sm.label}>LÉGENDE</Text>
+          <TextInput
+            style={sm.input}
+            value={caption}
+            onChangeText={setCaption}
+            placeholder="Écrire une légende..."
+            placeholderTextColor={Colors.textMuted}
+            multiline
+            maxLength={300}
+            autoFocus={false}
+          />
+          <Text style={sm.charCount}>{caption.length}/300</Text>
+
+          {/* Share button */}
+          <TouchableOpacity
+            style={sm.shareBtn}
+            onPress={handleConfirmShare}
+            activeOpacity={0.85}
+            disabled={isSending}
+          >
+            <LinearGradient
+              colors={Gradients.brand as [string, string]}
+              style={sm.shareBtnGrad}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Icon name="share" size={18} color="#fff" />
+              <Text style={sm.shareBtnText}>Partager</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={sm.cancelBtn} onPress={handleClose}>
+            <Text style={sm.cancelText}>Annuler</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+const sm = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    overflow: "hidden",
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: Platform.OS === "ios" ? 36 : 24,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignSelf: "center",
+    marginBottom: 4,
+  },
+  title: {
+    fontFamily: Fonts.bold,
+    fontSize: 17,
+    color: Colors.textPrimary,
+    textAlign: "center",
+  },
+  thumb: {
+    width: "100%",
+    height: 180,
+    borderRadius: 16,
+    backgroundColor: Colors.bgCard,
+  },
+  label: {
+    fontFamily: Fonts.bold,
+    fontSize: 11,
+    color: Colors.accentPurple,
+    letterSpacing: 1.5,
+  },
+  input: {
+    backgroundColor: Colors.bgCard,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontFamily: Fonts.regular,
+    fontSize: 15,
+    color: Colors.textPrimary,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    minHeight: 80,
+    textAlignVertical: "top",
+  },
+  charCount: {
+    fontFamily: Fonts.regular,
+    fontSize: 11,
+    color: Colors.textMuted,
+    textAlign: "right",
+    marginTop: -4,
+  },
+  shareBtn: {
+    borderRadius: 14,
+    overflow: "hidden",
+    marginTop: 4,
+  },
+  shareBtnGrad: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
+    gap: 8,
+  },
+  shareBtnText: { fontFamily: Fonts.bold, fontSize: 15, color: "#fff" },
+  cancelBtn: { alignItems: "center", paddingVertical: 8 },
+  cancelText: { fontFamily: Fonts.medium, fontSize: 15, color: Colors.textMuted },
+});
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function GalleryPhotoViewScreen() {
   const router = useRouter();
@@ -31,9 +214,10 @@ export default function GalleryPhotoViewScreen() {
   const photoId = params.photoId ?? "";
 
   const deletePhoto = useDeletePhoto();
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const handleImport = () => {
-    // Navigate to analysis import with this photo
+    hapticMedium();
     router.push({
       pathname: "/analyse/import",
       params: { photoUri },
@@ -41,6 +225,7 @@ export default function GalleryPhotoViewScreen() {
   };
 
   const handleEdit = () => {
+    hapticLight();
     router.push({
       pathname: "/edit/[photoId]",
       params: { photoId, photoUri },
@@ -48,24 +233,15 @@ export default function GalleryPhotoViewScreen() {
   };
 
   const handleAnalyse = () => {
+    hapticMedium();
     router.push({
       pathname: "/analyse/result",
       params: { photoId, photoUri },
     });
   };
 
-  const handleShare = async () => {
-    try {
-      await Share.share({
-        message: "Découvrez cette photo sur KaytiPic !",
-        url: photoUri,
-      });
-    } catch {
-      // User cancelled
-    }
-  };
-
   const handleDelete = () => {
+    hapticLight();
     Alert.alert(
       "Supprimer la photo",
       "Cette action est irréversible.",
@@ -75,6 +251,7 @@ export default function GalleryPhotoViewScreen() {
           text: "Supprimer",
           style: "destructive",
           onPress: async () => {
+            hapticHeavy();
             try {
               await deletePhoto.mutateAsync(photoId);
               router.back();
@@ -128,7 +305,7 @@ export default function GalleryPhotoViewScreen() {
           <Text style={s.actionLabel}>Retoucher</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={s.actionItem} onPress={handleShare}>
+        <TouchableOpacity style={s.actionItem} onPress={() => { hapticLight(); setShowShareModal(true); }}>
           <View style={s.actionIcon}>
             <Icon name="share" size={20} color={Colors.textSecondary} />
           </View>
@@ -162,6 +339,11 @@ export default function GalleryPhotoViewScreen() {
         </TouchableOpacity>
       </View>
 
+      <ShareCaptionModal
+        visible={showShareModal}
+        photoUri={photoUri}
+        onClose={() => setShowShareModal(false)}
+      />
     </View>
   );
 }

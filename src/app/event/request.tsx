@@ -62,6 +62,7 @@ function RequestForm({
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scroll}
+        keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
       >
         {/* Event info card */}

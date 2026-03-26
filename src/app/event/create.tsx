@@ -174,6 +174,7 @@ export default function CreateEventScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={s.scroll}
+          keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
         >
           <KaytiHeader showBack title="Créer un événement" />

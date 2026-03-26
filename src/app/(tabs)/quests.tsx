@@ -18,6 +18,7 @@ import { Fonts } from "../../theme/typography";
 import { KaytiHeader, BottomTabBar } from "../../components/ui";
 import { Icon, IconName } from "../../components/ui/Icon";
 import { useQuestPaths, useQuestStats } from "../../hooks/useQuestPaths";
+import { hapticMedium } from "../../utils/haptics";
 
 const { width } = Dimensions.get("window");
 
@@ -448,12 +449,13 @@ export default function QuestsScreen() {
             <PathCard
               key={path.id}
               path={path}
-              onPress={() =>
+              onPress={() => {
+                hapticMedium();
                 router.push({
                   pathname: "/quest/[pathId]",
                   params: { pathId: path.id },
-                })
-              }
+                });
+              }}
             />
           ))}
         </View>

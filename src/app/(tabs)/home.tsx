@@ -11,6 +11,7 @@ import {
   Modal,
   ImageBackground,
   ImageSourcePropType,
+  RefreshControl,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
@@ -24,6 +25,9 @@ import { useAuthStore } from "../../stores/authStore";
 import { usePhotos } from "../../hooks/usePhotos";
 import { useQuestPaths } from "../../hooks/useQuestPaths";
 import { useDailyTip } from "../../hooks/useDailyTip";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { notificationApi } from "../../services/api/notification.api";
+import { hapticLight, hapticMedium } from "../../utils/haptics";
 
 // Card background images
 const CARD_IMAGES = {
@@ -41,9 +45,10 @@ interface MenuCardProps {
   image: ImageSourcePropType;
   route: string;
   delay: number;
+  isPrimary?: boolean;
 }
 
-function MenuCard({ title, image, route, delay }: MenuCardProps) {
+function MenuCard({ title, image, route, delay, isPrimary }: MenuCardProps) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
@@ -67,16 +72,9 @@ function MenuCard({ title, image, route, delay }: MenuCardProps) {
 
   return (
     <Animated.View
-      style={[
-        mc.wrapper,
-        { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-      ]}
+      style={[mc.wrapper, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
     >
-      <TouchableOpacity
-        onPress={() => navigate(route)}
-        activeOpacity={0.85}
-        style={[mc.card]}
-      >
+      <TouchableOpacity onPress={() => { hapticLight(); navigate(route); }} activeOpacity={0.85} style={[mc.card, isPrimary && mc.cardPrimary]}>
         <ImageBackground
           source={image}
           style={mc.imageBg}
@@ -110,6 +108,11 @@ const mc = StyleSheet.create({
     borderRadius: 16,
     overflow: "hidden",
     borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  cardPrimary: {
+    borderColor: "#E91E8C",
+    borderWidth: 2,
   },
   imageBg: {
     flex: 1,
@@ -185,30 +188,18 @@ function ConseilModal({ visible, onClose, onTry, tip, category, isLoading }: Con
   }, [visible]);
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <Animated.View style={[cm.backdrop, { opacity: fadeAnim }]}>
-        <TouchableOpacity
-          style={StyleSheet.absoluteFillObject}
-          onPress={onClose}
-        />
-        <Animated.View
-          style={[cm.card, { transform: [{ translateY: slideAnim }] }]}
-        >
+        <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={onClose} />
+        <Animated.View style={[cm.card, { transform: [{ translateY: slideAnim }] }]}>
           <LinearGradient colors={["#5F2097", "#1F63DA"]} style={cm.cardBg} />
-          <TouchableOpacity style={cm.closeBtn} onPress={onClose}>
+          <TouchableOpacity style={cm.closeBtn} onPress={() => { hapticLight(); onClose(); }}>
             <Icon name="x" size={16} color={Colors.textPrimary} />
           </TouchableOpacity>
           <Text style={cm.title}>Conseil du jour</Text>
           {category && CATEGORY_LABELS[category] && (
             <View style={cm.categoryBadge}>
-              <Text style={cm.categoryText}>
-                {CATEGORY_LABELS[category]}
-              </Text>
+              <Text style={cm.categoryText}>{CATEGORY_LABELS[category]}</Text>
             </View>
           )}
           {isLoading ? (
@@ -221,11 +212,7 @@ function ConseilModal({ visible, onClose, onTry, tip, category, isLoading }: Con
               {tip || "Utilisez la règle des tiers pour des compositions plus dynamiques."}
             </Text>
           )}
-          <TouchableOpacity
-            style={cm.tryBtn}
-            activeOpacity={0.85}
-            onPress={onTry}
-          >
+          <TouchableOpacity style={cm.tryBtn} activeOpacity={0.85} onPress={() => { hapticMedium(); onTry(); }}>
             <View style={cm.tryBtnInner}>
               <Text style={cm.tryBtnText}>Essayer</Text>
               <Icon name="chevron-right" size={16} color="#D00A45" />
@@ -323,8 +310,16 @@ const cm = StyleSheet.create({
   },
 });
 
+function getTimeGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Bonjour";
+  if (hour < 18) return "Bon après-midi";
+  return "Bonsoir";
+}
+
 export default function HomeScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const displayName = useMemo(
     () =>
@@ -333,7 +328,9 @@ export default function HomeScreen() {
         : "Photographe",
     [user?.username],
   );
+  const greeting = useMemo(() => getTimeGreeting(), []);
   const [showConseil, setShowConseil] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const { data: dailyTip, isLoading: tipLoading } = useDailyTip();
   const headerFade = useRef(new Animated.Value(0)).current;
 
@@ -341,8 +338,7 @@ export default function HomeScreen() {
   const { data: photosData } = usePhotos();
   const totalPhotos = photosData?.total ?? 0;
   const analyzedPhotos = useMemo(
-    () =>
-      photosData?.photos?.filter((p) => (p.analyses?.length ?? 0) > 0).length ?? 0,
+    () => photosData?.photos?.filter((p) => (p.analyses?.length ?? 0) > 0).length ?? 0,
     [photosData?.photos],
   );
   // Quest progress from real backend data
@@ -355,8 +351,7 @@ export default function HomeScreen() {
     () => questPaths?.reduce((sum, p) => sum + (p.completedCount ?? 0), 0) ?? 0,
     [questPaths],
   );
-  const questPercent =
-    questTotal > 0 ? Math.round((questCompleted / questTotal) * 100) : 0;
+  const questPercent = questTotal > 0 ? Math.round((questCompleted / questTotal) * 100) : 0;
 
   useEffect(() => {
     Animated.timing(headerFade, {
@@ -365,6 +360,24 @@ export default function HomeScreen() {
       useNativeDriver: true,
     }).start();
   }, []);
+
+  const { data: notifData } = useQuery({
+    queryKey: ["notifUnread"],
+    queryFn: () => notificationApi.getUnreadCount().then((r) => r.data),
+    refetchInterval: 30000,
+  });
+  const unreadNotifCount = notifData?.count ?? 0;
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["photos"] }),
+      queryClient.invalidateQueries({ queryKey: ["questPaths"] }),
+      queryClient.invalidateQueries({ queryKey: ["dailyTip"] }),
+      queryClient.invalidateQueries({ queryKey: ["notifUnread"] }),
+    ]);
+    setRefreshing(false);
+  }, [queryClient]);
 
   const MENU_CARDS = useMemo(
     () => [
@@ -392,41 +405,63 @@ export default function HomeScreen() {
     [],
   );
 
-  const handleOpenConseil = useCallback(() => setShowConseil(true), []);
+  const handleOpenConseil = useCallback(() => { hapticLight(); setShowConseil(true); }, []);
   const handleCloseConseil = useCallback(() => setShowConseil(false), []);
   const handleTryConseil = useCallback(() => {
     setShowConseil(false);
     router.push("/(tabs)/camera");
   }, [router]);
-  const handleGoToGallery = useCallback(
-    () => router.push("/(tabs)/gallery"),
-    [router],
-  );
+  const handleGoToGallery = useCallback(() => { hapticLight(); router.push("/(tabs)/gallery"); }, [router]);
 
   return (
     <View style={s.container}>
       <StatusBar style="light" />
-      <LinearGradient
-        colors={["#0E0A24", "#080814"]}
-        style={StyleSheet.absoluteFillObject}
-      />
+      <LinearGradient colors={["#0E0A24", "#080814"]} style={StyleSheet.absoluteFillObject} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scroll}
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={Colors.accentPurple}
+            colors={[Colors.accentPurple]}
+          />
+        }
       >
-        <KaytiHeader showSettings />
+        <KaytiHeader
+          leftIcon={
+            <TouchableOpacity
+              style={hs.headerBtn}
+              onPress={() => { hapticLight(); navigate("/(tabs)/settings"); }}
+            >
+              <Icon name="settings" size={20} color={Colors.textPrimary} />
+            </TouchableOpacity>
+          }
+          rightIcon={
+            <TouchableOpacity
+              style={hs.headerBtn}
+              onPress={() => { hapticLight(); navigate("/notifications"); }}
+            >
+              <Icon name="bell" size={20} color={Colors.textPrimary} />
+              {unreadNotifCount > 0 && (
+                <View style={hs.badge}>
+                  <Text style={hs.badgeText}>
+                    {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          }
+        />
 
         {/* Profile header */}
         <Animated.View style={[s.profileHeader, { opacity: headerFade }]}>
-          <TouchableOpacity
-            style={s.galleryShortcut}
-            onPress={handleGoToGallery}
-          >
-            <LinearGradient
-              colors={Gradients.purpleBlue}
-              style={s.shortcutIcon}
-            >
+          <TouchableOpacity style={s.galleryShortcut} onPress={handleGoToGallery}>
+            <LinearGradient colors={Gradients.purpleBlue} style={s.shortcutIcon}>
               <Icon name="image" size={18} color="#FFFFFF" />
             </LinearGradient>
             <Text style={s.shortcutLabel}>Ma Galerie</Text>
@@ -434,7 +469,7 @@ export default function HomeScreen() {
 
           <TouchableOpacity
             style={s.avatarCenter}
-            onPress={() => navigate("/(tabs)/profile")}
+            onPress={() => { hapticLight(); navigate("/(tabs)/profile"); }}
             activeOpacity={0.8}
           >
             <View style={s.avatarRing}>
@@ -443,21 +478,16 @@ export default function HomeScreen() {
                   colors={["#2D1060", "#4D2090"]}
                   style={[{ flex: 1 }, s.avatarInner]}
                 >
-                  <Text style={s.avatarInitial}>
-                    {(user?.username ?? "?")[0].toUpperCase()}
-                  </Text>
+                  <Text style={s.avatarInitial}>{(user?.username ?? "?")[0].toUpperCase()}</Text>
                 </LinearGradient>
               </View>
             </View>
             <Text style={s.greeting}>
-              Hello, <Text style={s.greetingName}>{displayName}</Text>
+              {greeting}, <Text style={s.greetingName}>{displayName}</Text>
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={s.conseilShortcut}
-            onPress={handleOpenConseil}
-          >
+          <TouchableOpacity style={s.conseilShortcut} onPress={handleOpenConseil}>
             <LinearGradient colors={Gradients.redPink} style={s.shortcutIcon}>
               <Icon name="lightbulb" size={20} color="#FFFFFF" />
             </LinearGradient>
@@ -465,10 +495,30 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </Animated.View>
 
+        {/* Quick stats row */}
+        {totalPhotos > 0 && (
+          <View style={s.statsRow}>
+            <View style={s.statItem}>
+              <Text style={s.statValue}>{totalPhotos}</Text>
+              <Text style={s.statLabel}>Photos</Text>
+            </View>
+            <View style={s.statDivider} />
+            <View style={s.statItem}>
+              <Text style={s.statValue}>{analyzedPhotos}</Text>
+              <Text style={s.statLabel}>Analyses</Text>
+            </View>
+            <View style={s.statDivider} />
+            <View style={s.statItem}>
+              <Text style={s.statValue}>{questPercent}%</Text>
+              <Text style={s.statLabel}>Progression</Text>
+            </View>
+          </View>
+        )}
+
         {/* Menu cards */}
         <View style={s.menuCards}>
           {MENU_CARDS.map((card, i) => (
-            <MenuCard key={card.route + i} {...card} delay={200 + i * 100} />
+            <MenuCard key={card.route + i} {...card} delay={200 + i * 100} isPrimary={i === 0} />
           ))}
         </View>
 
@@ -492,13 +542,10 @@ export default function HomeScreen() {
               {totalPhotos === 0
                 ? "Prenez votre première photo !"
                 : analyzedPhotos < questTotal
-                ? "Analysez plus de photos pour progresser"
-                : "Toutes les quêtes sont complétées !"}
+                  ? "Analysez plus de photos pour progresser"
+                  : "Toutes les quêtes sont complétées !"}
             </Text>
-            <TouchableOpacity
-              style={s.voirBtn}
-              onPress={() => navigate("/(tabs)/quests")}
-            >
+            <TouchableOpacity style={s.voirBtn} onPress={() => { hapticLight(); navigate("/(tabs)/quests"); }}>
               <Text style={s.voirBtnText}>Voir</Text>
               <Icon name="chevron-right" size={16} color="#B70E46" />
             </TouchableOpacity>
@@ -578,6 +625,34 @@ const s = StyleSheet.create({
   },
   greetingName: { fontFamily: Fonts.bold, color: Colors.textPrimary },
 
+  statsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 30,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  statItem: { flex: 1, alignItems: "center", gap: 2 },
+  statValue: {
+    fontFamily: Fonts.extrabold,
+    fontSize: 20,
+    color: Colors.textPrimary,
+  },
+  statLabel: {
+    fontFamily: Fonts.regular,
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
+  statDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+
   menuCards: { paddingHorizontal: 20, gap: 10 },
 
   questCard: {
@@ -629,4 +704,32 @@ const s = StyleSheet.create({
 
   voirBtnText: { fontFamily: Fonts.bold, color: "#000", fontSize: 13 },
   bottomSpacer: { height: 100 },
+});
+
+// Header button styles (settings left / bell right)
+const hs = StyleSheet.create({
+  headerBtn: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badge: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: Colors.accentPink,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    fontFamily: Fonts.extrabold,
+    fontSize: 9,
+    color: "#fff",
+    includeFontPadding: false,
+  },
 });

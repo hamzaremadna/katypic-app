@@ -19,6 +19,7 @@ import { Colors, Gradients } from "../../theme/colors";
 import { KaytiHeader, BottomTabBar } from "../../components/ui";
 import { usePhotos, useDeletePhoto } from "../../hooks/usePhotos";
 import { Photo } from "../../services/api/photo.api";
+import { hapticLight, hapticMedium, hapticHeavy } from "../../utils/haptics";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const GRID_GAP = 10;
@@ -81,6 +82,7 @@ export default function GalleryScreen() {
 
   const handlePhotoPress = useCallback(
     (id: string) => {
+      hapticLight();
       if (selectionMode) {
         toggleSelect(id);
       } else {
@@ -118,6 +120,7 @@ export default function GalleryScreen() {
           text: "Supprimer",
           style: "destructive",
           onPress: async () => {
+            hapticHeavy();
             const ids = Array.from(selectedIds);
             const results = await Promise.allSettled(
               ids.map((id) => deletePhoto.mutateAsync(id)),
@@ -219,6 +222,7 @@ export default function GalleryScreen() {
         <TouchableOpacity
           style={styles.selectAllButton}
           onPress={() => {
+            hapticLight();
             if (!selectionMode) {
               setSelectionMode(true);
               setSelectedIds(new Set(photos.map((p) => p.id)));
@@ -296,18 +300,19 @@ export default function GalleryScreen() {
 
           <TouchableOpacity
             style={styles.selectionBarAll}
-            onPress={selectAll}
+            onPress={() => { hapticLight(); selectAll(); }}
           >
             <Text style={styles.selectionBarAllText}>Tout</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.shareButton}
-            onPress={() =>
+            onPress={() => {
+              hapticLight();
               Share.share({
                 message: `${selectedIds.size} photo${selectedIds.size > 1 ? "s" : ""} partagée${selectedIds.size > 1 ? "s" : ""} depuis KaytiPic`,
-              })
-            }
+              });
+            }}
           >
             <LinearGradient
               colors={Gradients.purpleBlue}

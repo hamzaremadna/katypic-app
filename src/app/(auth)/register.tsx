@@ -175,6 +175,7 @@ export default function RegisterScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={s.scroll}
+          keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
         >
           <KaytiHeader />

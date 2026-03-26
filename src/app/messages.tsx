@@ -8,6 +8,8 @@ import {
   TextInput,
   Platform,
   ActivityIndicator,
+  Modal,
+  Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -18,6 +20,8 @@ import { Colors, Gradients } from "../theme/colors";
 import { Fonts } from "../theme/typography";
 import { Icon } from "../components/ui/Icon";
 import { messageApi, Conversation } from "../services/api/message.api";
+import { blockApi } from "../services/api/block.api";
+import { hapticLight, hapticMedium, hapticHeavy } from "../utils/haptics";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -58,9 +62,162 @@ function formatTime(iso: string): string {
   return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
 }
 
+// ─── User Action Menu ──────────────────────────────────────────────────────────
+
+interface UserMenuProps {
+  userId: string;
+  username: string;
+  onClose: () => void;
+}
+
+function UserActionMenu({ userId, username, onClose }: UserMenuProps) {
+  const handleViewProfile = () => {
+    hapticLight();
+    onClose();
+    navigate(`/profile/${userId}`);
+  };
+
+  const handleMute = () => {
+    hapticLight();
+    onClose();
+    blockApi.muteUser(userId)
+      .then(() => Alert.alert("Mis en sourdine", `${username} a été mis en sourdine.`))
+      .catch(() => Alert.alert("Erreur", "Impossible de mettre en sourdine."));
+  };
+
+  const handleBlock = () => {
+    Alert.alert(
+      "Bloquer",
+      `Voulez-vous bloquer ${username} ?`,
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Bloquer",
+          style: "destructive",
+          onPress: () => {
+            hapticHeavy();
+            blockApi.blockUser(userId)
+              .then(() => onClose())
+              .catch(() => Alert.alert("Erreur", "Impossible de bloquer cet utilisateur."));
+          },
+        },
+      ]
+    );
+  };
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity
+        style={um.backdrop}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <View style={um.sheet}>
+          {/* User badge */}
+          <View style={um.userRow}>
+            <View style={[um.avatar, { backgroundColor: getAvatarColor(userId) }]}>
+              <Text style={um.avatarText}>{getInitials(username)}</Text>
+            </View>
+            <Text style={um.username}>{username}</Text>
+          </View>
+
+          <View style={um.divider} />
+
+          <TouchableOpacity style={um.action} onPress={handleViewProfile} activeOpacity={0.7}>
+            <Icon name="user" size={20} color={Colors.textPrimary} />
+            <Text style={um.actionText}>Voir le profil</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={um.action} onPress={handleMute} activeOpacity={0.7}>
+            <Icon name="bell" size={20} color={Colors.textSecondary} />
+            <Text style={[um.actionText, { color: Colors.textSecondary }]}>Mettre en sourdine</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={um.action} onPress={handleBlock} activeOpacity={0.7}>
+            <Icon name="x" size={20} color="#FF4D4D" />
+            <Text style={[um.actionText, { color: "#FF4D4D" }]}>Bloquer</Text>
+          </TouchableOpacity>
+
+          <View style={um.divider} />
+
+          <TouchableOpacity style={um.cancelBtn} onPress={onClose} activeOpacity={0.7}>
+            <Text style={um.cancelText}>Annuler</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
+const um = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: Colors.bgCard,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: Platform.OS === "ios" ? 34 : 20,
+    paddingTop: 20,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  userRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    gap: 14,
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: { fontFamily: Fonts.extrabold, fontSize: 15, color: "#fff" },
+  username: { fontFamily: Fonts.bold, fontSize: 16, color: Colors.textPrimary },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.cardBorder,
+    marginHorizontal: 20,
+    marginVertical: 4,
+  },
+  action: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+  },
+  actionText: {
+    fontFamily: Fonts.medium,
+    fontSize: 16,
+    color: Colors.textPrimary,
+  },
+  cancelBtn: {
+    alignItems: "center",
+    paddingVertical: 16,
+    marginTop: 4,
+  },
+  cancelText: {
+    fontFamily: Fonts.semibold,
+    fontSize: 16,
+    color: Colors.textSecondary,
+  },
+});
+
 // ─── Conversation Row ─────────────────────────────────────────────────────────
 
-function ConversationRow({ item }: { item: Conversation }) {
+interface ConversationRowProps {
+  item: Conversation;
+  onAvatarPress: (userId: string, username: string) => void;
+}
+
+function ConversationRow({ item, onAvatarPress }: ConversationRowProps) {
   const color = getAvatarColor(item.userId);
   const initials = getInitials(item.username);
 
@@ -68,18 +225,24 @@ function ConversationRow({ item }: { item: Conversation }) {
     <TouchableOpacity
       style={s.row}
       activeOpacity={0.75}
-      onPress={() =>
+      onPress={() => {
+        hapticLight();
         navigate(
           `/chat/${item.userId}?name=${encodeURIComponent(item.username)}`
-        )
-      }
+        );
+      }}
     >
-      {/* Avatar */}
-      <View style={s.avatarWrapper}>
+      {/* Avatar — tap opens user action menu */}
+      <TouchableOpacity
+        style={s.avatarWrapper}
+        onPress={() => { hapticLight(); onAvatarPress(item.userId, item.username); }}
+        hitSlop={6}
+        activeOpacity={0.7}
+      >
         <View style={[s.avatar, { backgroundColor: color }]}>
           <Text style={s.avatarText}>{initials}</Text>
         </View>
-      </View>
+      </TouchableOpacity>
 
       {/* Content */}
       <View style={s.rowContent}>
@@ -122,6 +285,7 @@ export default function MessagesScreen() {
   const [activeTab, setActiveTab] = useState<"principal" | "general">(
     "principal"
   );
+  const [userMenu, setUserMenu] = useState<{ userId: string; username: string } | null>(null);
 
   const {
     data: conversations = [],
@@ -158,16 +322,11 @@ export default function MessagesScreen() {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
         />
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity style={s.backBtn} onPress={() => { hapticLight(); router.back(); }}>
           <Icon name="arrow-left" size={22} color="#fff" />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Mes messages</Text>
-        <TouchableOpacity
-          style={s.settingsBtn}
-          onPress={() => navigate("/(tabs)/settings")}
-        >
-          <Icon name="settings" size={20} color="#fff" />
-        </TouchableOpacity>
+        <View style={s.settingsBtn} />
       </View>
 
       {/* Search */}
@@ -236,9 +395,16 @@ export default function MessagesScreen() {
         <FlatList
           data={displayed}
           keyExtractor={(item) => item.userId}
-          renderItem={({ item }) => <ConversationRow item={item} />}
+          renderItem={({ item }) => (
+            <ConversationRow
+              item={item}
+              onAvatarPress={(userId, username) => setUserMenu({ userId, username })}
+            />
+          )}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={s.list}
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             <View style={s.empty}>
               <Icon name="message-chat" size={40} color={Colors.textMuted} />
@@ -252,6 +418,14 @@ export default function MessagesScreen() {
         />
       )}
 
+      {/* User action menu */}
+      {userMenu && (
+        <UserActionMenu
+          userId={userMenu.userId}
+          username={userMenu.username}
+          onClose={() => setUserMenu(null)}
+        />
+      )}
     </View>
   );
 }

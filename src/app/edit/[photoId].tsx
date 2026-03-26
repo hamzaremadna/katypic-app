@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,9 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  PanResponder,
+  GestureResponderEvent,
+  PanResponderGestureState,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
@@ -29,6 +32,7 @@ import { Fonts } from "../../theme/typography";
 import { KaytiHeader } from "../../components/ui";
 import { Icon, IconName } from "../../components/ui/Icon";
 import { aiApi } from "../../services/api/ai.api";
+import { hapticLight, hapticMedium } from "../../utils/haptics";
 
 const { width } = Dimensions.get("window");
 
@@ -174,7 +178,7 @@ const sl = StyleSheet.create({
 // ─────────────────────────────────────────────
 function PresetPill({ preset, isSelected, onPress }: { preset: PresetDef; isSelected: boolean; onPress: () => void }) {
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={pl.wrapper}>
+    <TouchableOpacity onPress={() => { hapticLight(); onPress(); }} activeOpacity={0.7} style={pl.wrapper}>
       {isSelected ? (
         <LinearGradient colors={Gradients.brand} style={pl.circle} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
           <Icon name={preset.icon} size={22} color={Colors.textPrimary} />
@@ -202,7 +206,7 @@ const pl = StyleSheet.create({
 // ─────────────────────────────────────────────
 function RatioItem({ item, isSelected, onPress }: { item: AspectRatio; isSelected: boolean; onPress: () => void }) {
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={rt.wrapper}>
+    <TouchableOpacity onPress={() => { hapticLight(); onPress(); }} activeOpacity={0.7} style={rt.wrapper}>
       {isSelected ? (
         <LinearGradient colors={Gradients.brand} style={rt.card} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
           <View style={rt.checkBadge}>
@@ -241,6 +245,148 @@ const rt = StyleSheet.create({
 });
 
 // ─────────────────────────────────────────────
+// Crop Overlay (with PanResponder)
+// ─────────────────────────────────────────────
+const MIN_CROP = 60;
+
+interface CropOverlayProps {
+  selectedRatio: string;
+  isFreeCrop: boolean;
+  freeCropBox: { x: number; y: number; w: number; h: number };
+  setFreeCropBox: React.Dispatch<React.SetStateAction<{ x: number; y: number; w: number; h: number }>>;
+  setScrollEnabled: (v: boolean) => void;
+  containerW: number;
+  containerH: number;
+}
+
+function CropOverlay({ selectedRatio, isFreeCrop, freeCropBox, setFreeCropBox, setScrollEnabled, containerW, containerH }: CropOverlayProps) {
+  const activeHandle = useRef("");
+  const startBox = useRef({ x: 0, y: 0, w: 0, h: 0 });
+  const boxRef = useRef(freeCropBox);
+  const isFreeCropRef = useRef(isFreeCrop);
+
+  // Keep refs in sync without recreating PanResponder
+  useEffect(() => { boxRef.current = freeCropBox; }, [freeCropBox]);
+  useEffect(() => { isFreeCropRef.current = isFreeCrop; }, [isFreeCrop]);
+
+  let cropX: number, cropY: number, cropW: number, cropH: number;
+
+  if (isFreeCrop) {
+    cropX = freeCropBox.x;
+    cropY = freeCropBox.y;
+    cropW = freeCropBox.w;
+    cropH = freeCropBox.h;
+  } else {
+    const ratioObj = ASPECT_RATIOS.find((r) => r.key === selectedRatio);
+    if (!ratioObj?.ratio) return null;
+    const containerRatio = containerW / containerH;
+    const targetRatio = ratioObj.ratio;
+    if (targetRatio > containerRatio) {
+      cropW = containerW;
+      cropH = containerW / targetRatio;
+    } else {
+      cropH = containerH;
+      cropW = containerH * targetRatio;
+    }
+    cropX = (containerW - cropW) / 2;
+    cropY = (containerH - cropH) / 2;
+  }
+
+  // PanResponder created ONCE — uses refs, no stale closures
+  const panResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => isFreeCropRef.current,
+    onMoveShouldSetPanResponder: () => isFreeCropRef.current,
+    onPanResponderGrant: (e) => {
+      const { locationX, locationY } = e.nativeEvent;
+      const b = boxRef.current;
+      startBox.current = { ...b };
+
+      // Determine which handle/region was touched
+      const edge = 35;
+      const inT = Math.abs(locationY - b.y) < edge;
+      const inB = Math.abs(locationY - (b.y + b.h)) < edge;
+      const inL = Math.abs(locationX - b.x) < edge;
+      const inR = Math.abs(locationX - (b.x + b.w)) < edge;
+      if (inT && inL) activeHandle.current = "tl";
+      else if (inT && inR) activeHandle.current = "tr";
+      else if (inB && inL) activeHandle.current = "bl";
+      else if (inB && inR) activeHandle.current = "br";
+      else if (inT) activeHandle.current = "t";
+      else if (inB) activeHandle.current = "b";
+      else if (inL) activeHandle.current = "l";
+      else if (inR) activeHandle.current = "r";
+      else if (locationX > b.x && locationX < b.x + b.w && locationY > b.y && locationY < b.y + b.h) activeHandle.current = "move";
+      else activeHandle.current = "";
+
+      if (activeHandle.current) setScrollEnabled(false);
+    },
+    onPanResponderMove: (_e, gs) => {
+      const h = activeHandle.current;
+      if (!h) return;
+      const b = startBox.current;
+      const dx = gs.dx;
+      const dy = gs.dy;
+
+      let nx = b.x, ny = b.y, nw = b.w, nh = b.h;
+
+      if (h === "move") {
+        nx = Math.max(0, Math.min(b.x + dx, containerW - b.w));
+        ny = Math.max(0, Math.min(b.y + dy, containerH - b.h));
+      } else {
+        if (h.includes("l")) { nx = Math.max(0, Math.min(b.x + dx, b.x + b.w - MIN_CROP)); nw = b.w - (nx - b.x); }
+        if (h.includes("r")) { nw = Math.max(MIN_CROP, Math.min(b.w + dx, containerW - b.x)); }
+        if (h.includes("t")) { ny = Math.max(0, Math.min(b.y + dy, b.y + b.h - MIN_CROP)); nh = b.h - (ny - b.y); }
+        if (h.includes("b")) { nh = Math.max(MIN_CROP, Math.min(b.h + dy, containerH - b.y)); }
+      }
+
+      const next = { x: nx, y: ny, w: nw, h: nh };
+      boxRef.current = next;
+      setFreeCropBox(next);
+    },
+    onPanResponderRelease: () => {
+      activeHandle.current = "";
+      setScrollEnabled(true);
+    },
+    onPanResponderTerminate: () => {
+      activeHandle.current = "";
+      setScrollEnabled(true);
+    },
+  })).current;
+
+  const Handle = ({ style }: { style: object }) => (
+    <View style={[{ position: "absolute", width: 24, height: 24, zIndex: 10 }, style]}>
+      <View style={{ position: "absolute", top: 0, left: 0, width: 24, height: 3, backgroundColor: "#fff", borderRadius: 1 }} />
+      <View style={{ position: "absolute", top: 0, left: 0, width: 3, height: 24, backgroundColor: "#fff", borderRadius: 1 }} />
+    </View>
+  );
+
+  return (
+    <View style={StyleSheet.absoluteFillObject} {...panResponder.panHandlers}>
+      {/* Darkened overlay regions */}
+      <View style={{ position: "absolute", top: 0, left: 0, right: 0, height: Math.max(0, cropY), backgroundColor: "rgba(0,0,0,0.6)", borderTopLeftRadius: 16, borderTopRightRadius: 16 }} />
+      <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: Math.max(0, containerH - cropY - cropH), backgroundColor: "rgba(0,0,0,0.6)", borderBottomLeftRadius: 16, borderBottomRightRadius: 16 }} />
+      <View style={{ position: "absolute", top: cropY, left: 0, width: Math.max(0, cropX), height: cropH, backgroundColor: "rgba(0,0,0,0.6)" }} />
+      <View style={{ position: "absolute", top: cropY, right: 0, width: Math.max(0, containerW - cropX - cropW), height: cropH, backgroundColor: "rgba(0,0,0,0.6)" }} />
+
+      {/* Border around crop area */}
+      <View style={{ position: "absolute", top: cropY, left: cropX, width: cropW, height: cropH, borderWidth: 1.5, borderColor: "#fff" }} />
+
+      {/* Corner handles */}
+      <Handle style={{ top: cropY - 2, left: cropX - 2 }} />
+      <Handle style={{ top: cropY - 2, left: cropX + cropW - 22, transform: [{ scaleX: -1 }] }} />
+      <Handle style={{ top: cropY + cropH - 22, left: cropX - 2, transform: [{ scaleY: -1 }] }} />
+      <Handle style={{ top: cropY + cropH - 22, left: cropX + cropW - 22, transform: [{ scaleX: -1 }, { scaleY: -1 }] }} />
+
+      {/* Rule of thirds grid */}
+      <View style={{ position: "absolute", top: cropY + cropH / 3, left: cropX + 1, width: cropW - 2, height: 0.5, backgroundColor: "rgba(255,255,255,0.25)" }} />
+      <View style={{ position: "absolute", top: cropY + (cropH * 2) / 3, left: cropX + 1, width: cropW - 2, height: 0.5, backgroundColor: "rgba(255,255,255,0.25)" }} />
+      <View style={{ position: "absolute", top: cropY + 1, left: cropX + cropW / 3, width: 0.5, height: cropH - 2, backgroundColor: "rgba(255,255,255,0.25)" }} />
+      <View style={{ position: "absolute", top: cropY + 1, left: cropX + (cropW * 2) / 3, width: 0.5, height: cropH - 2, backgroundColor: "rgba(255,255,255,0.25)" }} />
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────
 // Main Editor Screen
 // ─────────────────────────────────────────────
 export default function RetoucheScreen() {
@@ -259,6 +405,10 @@ export default function RetoucheScreen() {
   const [rotation, setRotation] = useState(0);
   const [flipH, setFlipH] = useState(false);
   const [flipV, setFlipV] = useState(false);
+  const [isFreeCrop, setIsFreeCrop] = useState(false);
+  const [freeCropBox, setFreeCropBox] = useState({ x: 40, y: 40, w: width - 24 - 80, h: 280 });
+  const [scrollEnabled, setScrollEnabled] = useState(true);
+  const dragStart = useRef({ x: 0, y: 0, box: { x: 0, y: 0, w: 0, h: 0 }, handle: "" });
   const [adjustments, setAdjustments] = useState<Record<string, number>>(
     Object.fromEntries(ADJUSTMENTS.map((a) => [a.key, a.defaultValue]))
   );
@@ -371,17 +521,32 @@ export default function RetoucheScreen() {
       if (flipH) actions.push({ flip: ImageManipulator.FlipType.Horizontal });
       if (flipV) actions.push({ flip: ImageManipulator.FlipType.Vertical });
 
-      const ratioObj = ASPECT_RATIOS.find((r) => r.key === selectedRatio);
-      if (ratioObj?.ratio) {
-        const dims = await new Promise<{ width: number; height: number }>((res, rej) => {
-          Image.getSize(sourceUri, (w, h) => res({ width: w, height: h }), rej);
-        });
-        const target = ratioObj.ratio;
-        const imgR = dims.width / dims.height;
-        let cw: number, ch: number;
-        if (imgR > target) { ch = dims.height; cw = Math.round(ch * target); }
-        else { cw = dims.width; ch = Math.round(cw / target); }
-        actions.push({ crop: { originX: Math.round((dims.width - cw) / 2), originY: Math.round((dims.height - ch) / 2), width: cw, height: ch } });
+      const dims = await new Promise<{ width: number; height: number }>((res, rej) => {
+        Image.getSize(sourceUri, (w, h) => res({ width: w, height: h }), rej);
+      });
+
+      if (isFreeCrop) {
+        // Map free crop box (preview coords) to actual image pixels
+        const containerW = width - 24;
+        const containerH = 360;
+        const scaleX = dims.width / containerW;
+        const scaleY = dims.height / containerH;
+        actions.push({ crop: {
+          originX: Math.round(freeCropBox.x * scaleX),
+          originY: Math.round(freeCropBox.y * scaleY),
+          width: Math.round(freeCropBox.w * scaleX),
+          height: Math.round(freeCropBox.h * scaleY),
+        }});
+      } else {
+        const ratioObj = ASPECT_RATIOS.find((r) => r.key === selectedRatio);
+        if (ratioObj?.ratio) {
+          const target = ratioObj.ratio;
+          const imgR = dims.width / dims.height;
+          let cw: number, ch: number;
+          if (imgR > target) { ch = dims.height; cw = Math.round(ch * target); }
+          else { cw = dims.width; ch = Math.round(cw / target); }
+          actions.push({ crop: { originX: Math.round((dims.width - cw) / 2), originY: Math.round((dims.height - ch) / 2), width: cw, height: ch } });
+        }
       }
 
       const result = actions.length > 0
@@ -416,6 +581,8 @@ export default function RetoucheScreen() {
     setFlipH(false);
     setFlipV(false);
     setSelectedRatio("original");
+    setIsFreeCrop(false);
+    setFreeCropBox({ x: 40, y: 40, w: width - 24 - 80, h: 280 });
     setShowAi(false);
   }, []);
 
@@ -434,13 +601,13 @@ export default function RetoucheScreen() {
             <Image source={{ uri: savedUri }} style={ss.photo} resizeMode="contain" />
           </View>
 
-          <TouchableOpacity style={ss.shareBtn} onPress={handleShare} activeOpacity={0.7}>
+          <TouchableOpacity style={ss.shareBtn} onPress={() => { hapticLight(); handleShare(); }} activeOpacity={0.7}>
             <Text style={ss.shareBtnText}>Partager</Text>
           </TouchableOpacity>
 
           <View style={ss.socialRow}>
             {([["Instagram", "image"], ["Stories", "plus"], ["WhatsApp", "message-circle"], ["Facebook", "globe"]] as [string, IconName][]).map(([label, icon]) => (
-              <TouchableOpacity key={label} style={ss.socialItem} onPress={handleShare} activeOpacity={0.7}>
+              <TouchableOpacity key={label} style={ss.socialItem} onPress={() => { hapticLight(); handleShare(); }} activeOpacity={0.7}>
                 <View style={ss.socialIcon}><Icon name={icon} size={22} color={Colors.textPrimary} /></View>
                 <Text style={ss.socialLabel}>{label}</Text>
               </TouchableOpacity>
@@ -484,13 +651,13 @@ export default function RetoucheScreen() {
           <Animated.View style={[es.tabInd, { transform: [{ translateX: tabTranslate }] }]}>
             <LinearGradient colors={Gradients.brand} style={es.tabIndGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
           </Animated.View>
-          <TouchableOpacity onPress={() => setActiveTab("ajuster")} style={es.tabBtn} activeOpacity={0.7}>
+          <TouchableOpacity onPress={() => { hapticLight(); setActiveTab("ajuster"); }} style={es.tabBtn} activeOpacity={0.7}>
             <View style={es.tabBtnRow}>
               <Icon name="sliders" size={16} color={activeTab === "ajuster" ? "#fff" : Colors.textMuted} />
               <Text style={[es.tabText, activeTab === "ajuster" && es.tabActive]}>Ajuster</Text>
             </View>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setActiveTab("recadrer")} style={es.tabBtn} activeOpacity={0.7}>
+          <TouchableOpacity onPress={() => { hapticLight(); setActiveTab("recadrer"); }} style={es.tabBtn} activeOpacity={0.7}>
             <View style={es.tabBtnRow}>
               <Icon name="crop" size={16} color={activeTab === "recadrer" ? "#fff" : Colors.textMuted} />
               <Text style={[es.tabText, activeTab === "recadrer" && es.tabActive]}>Recadrer</Text>
@@ -499,8 +666,8 @@ export default function RetoucheScreen() {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={es.scroll}>
-        {/* Photo Preview with live color adjustments */}
+      {/* Photo Preview - OUTSIDE ScrollView so crop gestures don't conflict */}
+      <View style={es.photoOuter}>
         <ViewShot ref={viewShotRef} options={{ format: "jpg", quality: 0.9 }} style={es.photoWrap}>
           {photoUri ? (
             <Brightness amount={brightnessAmount}>
@@ -522,12 +689,26 @@ export default function RetoucheScreen() {
           )}
         </ViewShot>
 
+        {/* Live crop overlay - sits on top of photo, outside ScrollView */}
+        {(selectedRatio !== "original" || isFreeCrop) && <CropOverlay
+          selectedRatio={selectedRatio}
+          isFreeCrop={isFreeCrop}
+          freeCropBox={freeCropBox}
+          setFreeCropBox={setFreeCropBox}
+          setScrollEnabled={setScrollEnabled}
+          containerW={width - 24}
+          containerH={360}
+        />}
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={es.scroll} scrollEnabled={scrollEnabled}>
+
         {/* Reset + AI Button */}
         <View style={es.aiRow}>
-          <TouchableOpacity onPress={handleReset} style={es.resetBtn} activeOpacity={0.7}>
+          <TouchableOpacity onPress={() => { hapticLight(); handleReset(); }} style={es.resetBtn} activeOpacity={0.7}>
             <Icon name="refresh" size={20} color={Colors.textSecondary} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleAIRetouch} activeOpacity={0.85} style={es.aiBtnWrap} disabled={aiLoading}>
+          <TouchableOpacity onPress={() => { hapticMedium(); handleAIRetouch(); }} activeOpacity={0.85} style={es.aiBtnWrap} disabled={aiLoading}>
             <LinearGradient colors={["#7B2FBE", "#2B7FFF"]} style={es.aiBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
               {aiLoading ? <ActivityIndicator size="small" color="#fff" /> : <Icon name="sparkles" size={20} color="#fff" />}
               <Text style={es.aiBtnText}>IA Retouche Photo</Text>
@@ -543,7 +724,7 @@ export default function RetoucheScreen() {
               <Text style={es.aiCardCount}>{aiIdx + 1}/{aiSuggestions.length}</Text>
             </View>
             <View style={es.aiCardBody}>
-              <TouchableOpacity onPress={() => setAiIdx((i) => Math.max(0, i - 1))} disabled={aiIdx === 0} style={es.aiNav}>
+              <TouchableOpacity onPress={() => { hapticLight(); setAiIdx((i) => Math.max(0, i - 1)); }} disabled={aiIdx === 0} style={es.aiNav}>
                 <Icon name="chevron-left" size={20} color={aiIdx === 0 ? Colors.textMuted : "#fff"} />
               </TouchableOpacity>
               <View style={es.aiCardPillWrap}>
@@ -555,11 +736,11 @@ export default function RetoucheScreen() {
                   </View>
                 </LinearGradient>
               </View>
-              <TouchableOpacity onPress={() => setAiIdx((i) => Math.min(aiSuggestions.length - 1, i + 1))} disabled={aiIdx === aiSuggestions.length - 1} style={es.aiNav}>
+              <TouchableOpacity onPress={() => { hapticLight(); setAiIdx((i) => Math.min(aiSuggestions.length - 1, i + 1)); }} disabled={aiIdx === aiSuggestions.length - 1} style={es.aiNav}>
                 <Icon name="chevron-right" size={20} color={aiIdx === aiSuggestions.length - 1 ? Colors.textMuted : "#fff"} />
               </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={handleApplySuggestion} style={es.aiApply} activeOpacity={0.7}>
+            <TouchableOpacity onPress={() => { hapticMedium(); handleApplySuggestion(); }} style={es.aiApply} activeOpacity={0.7}>
               <Text style={es.aiApplyText}>Appliquer cette suggestion</Text>
             </TouchableOpacity>
           </View>
@@ -597,10 +778,10 @@ export default function RetoucheScreen() {
                   </View>
                 </View>
                 <View style={es.intActions}>
-                  <TouchableOpacity style={es.intActionBtn} onPress={() => { setSelectedPreset(null); applyPreset(null, 0); }}>
+                  <TouchableOpacity style={es.intActionBtn} onPress={() => { hapticLight(); setSelectedPreset(null); applyPreset(null, 0); }}>
                     <Icon name="x" size={18} color={Colors.textSecondary} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={es.intActionBtn} onPress={() => setSelectedPreset(null)}>
+                  <TouchableOpacity style={es.intActionBtn} onPress={() => { hapticLight(); setSelectedPreset(null); }}>
                     <Icon name="check" size={18} color={Colors.accentGreen} />
                   </TouchableOpacity>
                 </View>
@@ -624,32 +805,32 @@ export default function RetoucheScreen() {
             <View style={es.ratioSection}>
               <View style={es.ratioGrid}>
                 {ASPECT_RATIOS.map((item) => (
-                  <RatioItem key={item.key} item={item} isSelected={selectedRatio === item.key} onPress={() => setSelectedRatio(item.key)} />
+                  <RatioItem key={item.key} item={item} isSelected={selectedRatio === item.key && !isFreeCrop} onPress={() => { setSelectedRatio(item.key); setIsFreeCrop(false); }} />
                 ))}
               </View>
             </View>
 
-            <TouchableOpacity activeOpacity={0.7} style={es.freeCrop} onPress={() => setSelectedRatio("original")}>
+            <TouchableOpacity activeOpacity={0.7} style={[es.freeCrop, isFreeCrop && es.freeCropActive]} onPress={() => { hapticLight(); setIsFreeCrop(!isFreeCrop); setSelectedRatio("original"); }}>
               <View style={es.freeCropInner}>
-                <Icon name="crop" size={18} color={Colors.textSecondary} />
-                <Text style={es.freeCropText}>Recadrage libre</Text>
+                <Icon name="crop" size={18} color={isFreeCrop ? "#fff" : Colors.textSecondary} />
+                <Text style={[es.freeCropText, isFreeCrop && { color: "#fff" }]}>Recadrage libre</Text>
               </View>
             </TouchableOpacity>
 
             <View style={es.rotRow}>
-              <TouchableOpacity style={es.rotBtn} onPress={handleRotateLeft} activeOpacity={0.7}>
+              <TouchableOpacity style={es.rotBtn} onPress={() => { hapticLight(); handleRotateLeft(); }} activeOpacity={0.7}>
                 <View style={es.rotBtnBg}><Icon name="flip-backward" size={20} color={Colors.textSecondary} /></View>
                 <Text style={es.rotLabel}>-90°</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={es.rotBtn} onPress={handleRotateRight} activeOpacity={0.7}>
+              <TouchableOpacity style={es.rotBtn} onPress={() => { hapticLight(); handleRotateRight(); }} activeOpacity={0.7}>
                 <View style={es.rotBtnBg}><Icon name="flip-forward" size={20} color={Colors.textSecondary} /></View>
                 <Text style={es.rotLabel}>+90°</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={es.rotBtn} onPress={handleFlipV} activeOpacity={0.7}>
+              <TouchableOpacity style={es.rotBtn} onPress={() => { hapticLight(); handleFlipV(); }} activeOpacity={0.7}>
                 <View style={[es.rotBtnBg, flipV && es.rotBtnActive]}><Icon name="switch-horizontal" size={20} color={flipV ? "#fff" : Colors.textSecondary} /></View>
                 <Text style={es.rotLabel}>Flip V</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={es.rotBtn} onPress={handleFlipH} activeOpacity={0.7}>
+              <TouchableOpacity style={es.rotBtn} onPress={() => { hapticLight(); handleFlipH(); }} activeOpacity={0.7}>
                 <View style={[es.rotBtnBg, flipH && es.rotBtnActive]}><Icon name="switch-horizontal" size={20} color={flipH ? "#fff" : Colors.textSecondary} /></View>
                 <Text style={es.rotLabel}>Flip H</Text>
               </TouchableOpacity>
@@ -659,7 +840,7 @@ export default function RetoucheScreen() {
 
         {/* Export */}
         <View style={es.exportWrap}>
-          <TouchableOpacity onPress={handleExport} activeOpacity={0.85} disabled={exporting}>
+          <TouchableOpacity onPress={() => { hapticMedium(); handleExport(); }} activeOpacity={0.85} disabled={exporting}>
             <LinearGradient colors={Gradients.brand} style={es.exportBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
               {exporting ? <ActivityIndicator size="small" color="#fff" /> : (
                 <>
@@ -718,7 +899,8 @@ const es = StyleSheet.create({
   tabActive: { color: "#fff", fontFamily: Fonts.bold },
 
   // Photo
-  photoWrap: { marginHorizontal: 12, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: Colors.cardBorder, height: 360, backgroundColor: "#0A0A14" },
+  photoOuter: { marginHorizontal: 12, position: "relative" },
+  photoWrap: { borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: Colors.cardBorder, height: 360, backgroundColor: "#0A0A14" },
   photo: { width: "100%", height: 360, borderRadius: 16 },
   photoEmpty: { width: "100%", height: 360, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   photoEmptyText: { fontSize: 14, color: Colors.textMuted, fontFamily: Fonts.semibold },
@@ -775,6 +957,7 @@ const es = StyleSheet.create({
 
   // Free crop
   freeCrop: { marginHorizontal: 20, borderRadius: 16, backgroundColor: Colors.bgCard, borderWidth: 1, borderColor: Colors.cardBorder },
+  freeCropActive: { borderColor: Colors.accentPurple, backgroundColor: "rgba(123,47,190,0.15)" },
   freeCropInner: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 14, gap: 10 },
   freeCropText: { fontSize: 14, fontFamily: Fonts.semibold, color: Colors.textSecondary },
 

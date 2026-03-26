@@ -10,6 +10,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Modal,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -19,6 +20,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors, Gradients } from "../../theme/colors";
 import { Icon } from "../../components/ui/Icon";
 import { messageApi, DirectMessage } from "../../services/api/message.api";
+import { blockApi } from "../../services/api/block.api";
+import { hapticLight, hapticMedium } from "../../utils/haptics";
 import { useAuthStore } from "../../stores/authStore";
 
 // Only call the real API if the ID is a proper UUID (not a mock numeric ID)
@@ -59,12 +62,110 @@ function MessageBubble({
   );
 }
 
+// ─── User action bottom sheet ────────────────────────────────────────────────
+
+function UserActionMenu({
+  visible,
+  userId: targetId,
+  username,
+  onClose,
+}: {
+  visible: boolean;
+  userId: string;
+  username: string;
+  onClose: () => void;
+}) {
+  const handleViewProfile = () => {
+    hapticLight();
+    onClose();
+    navigate(`/profile/${targetId}`);
+  };
+  const handleMute = () => {
+    hapticLight();
+    onClose();
+    blockApi.muteUser(targetId)
+      .then(() => Alert.alert("Mis en sourdine", `${username} a été mis en sourdine.`))
+      .catch(() => Alert.alert("Erreur", "Impossible de mettre en sourdine."));
+  };
+  const handleBlock = () => {
+    Alert.alert("Bloquer", `Voulez-vous bloquer ${username} ?`, [
+      { text: "Annuler", style: "cancel" },
+      {
+        text: "Bloquer",
+        style: "destructive",
+        onPress: () => {
+          hapticLight();
+          blockApi.blockUser(targetId)
+            .then(() => onClose())
+            .catch(() => Alert.alert("Erreur", "Impossible de bloquer cet utilisateur."));
+        },
+      },
+    ]);
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity style={ua.backdrop} activeOpacity={1} onPress={onClose}>
+        <View style={ua.sheet}>
+          <View style={ua.userRow}>
+            <View style={ua.avatar}>
+              <LinearGradient colors={["#4D2090", "#2D1060"]} style={{ flex: 1, borderRadius: 22 }} />
+            </View>
+            <Text style={ua.username}>{username}</Text>
+          </View>
+          <View style={ua.divider} />
+          <TouchableOpacity style={ua.action} onPress={handleViewProfile} activeOpacity={0.7}>
+            <Icon name="user" size={20} color="#fff" />
+            <Text style={ua.actionText}>Voir le profil</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={ua.action} onPress={handleMute} activeOpacity={0.7}>
+            <Icon name="bell" size={20} color={Colors.textSecondary} />
+            <Text style={[ua.actionText, { color: Colors.textSecondary }]}>Mettre en sourdine</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={ua.action} onPress={handleBlock} activeOpacity={0.7}>
+            <Icon name="x" size={20} color="#FF4D4D" />
+            <Text style={[ua.actionText, { color: "#FF4D4D" }]}>Bloquer</Text>
+          </TouchableOpacity>
+          <View style={ua.divider} />
+          <TouchableOpacity style={ua.cancelBtn} onPress={onClose} activeOpacity={0.7}>
+            <Text style={ua.cancelText}>Annuler</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
+const ua = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
+  sheet: {
+    backgroundColor: "#12102A",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: Platform.OS === "ios" ? 34 : 20,
+    paddingTop: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  userRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingBottom: 16, gap: 14 },
+  avatar: { width: 44, height: 44, borderRadius: 22, overflow: "hidden" },
+  username: { fontSize: 16, fontWeight: "700", color: "#fff" },
+  divider: { height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginHorizontal: 20, marginVertical: 4 },
+  action: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 16, paddingHorizontal: 24 },
+  actionText: { fontSize: 16, fontWeight: "500", color: "#fff" },
+  cancelBtn: { alignItems: "center", paddingVertical: 16, marginTop: 4 },
+  cancelText: { fontSize: 16, fontWeight: "600", color: Colors.textSecondary },
+});
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+
 export default function ChatScreen() {
   const { userId, name } = useLocalSearchParams<{ userId: string; name?: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
   const myId = useAuthStore((s) => s.user?.id);
   const [input, setInput] = useState("");
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   // Only query the real API when the userId is a valid UUID
@@ -96,6 +197,7 @@ export default function ChatScreen() {
   const handleSend = () => {
     const text = input.trim();
     if (!text) return;
+    hapticMedium();
     setInput("");
     sendMutation.mutate(text);
   };
@@ -126,7 +228,7 @@ export default function ChatScreen() {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
           />
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+          <TouchableOpacity onPress={() => { hapticLight(); router.back(); }} style={s.backBtn}>
             <Icon name="arrow-left" size={22} color="#fff" />
           </TouchableOpacity>
           <View style={s.headerCenter}>
@@ -140,7 +242,7 @@ export default function ChatScreen() {
           </View>
           <TouchableOpacity
             style={s.settingsBtn}
-            onPress={() => navigate("/(tabs)/settings")}
+            onPress={() => { hapticLight(); setShowUserMenu(true); }}
           >
             <Icon name="settings" size={18} color="#fff" />
           </TouchableOpacity>
@@ -171,6 +273,8 @@ export default function ChatScreen() {
             maxToRenderPerBatch={20}
             windowSize={7}
             removeClippedSubviews={Platform.OS === "android"}
+            keyboardDismissMode="interactive"
+            keyboardShouldPersistTaps="handled"
           />
         )}
 
@@ -178,7 +282,7 @@ export default function ChatScreen() {
         <View style={s.inputBar}>
           <TouchableOpacity
             style={s.inputIcon}
-            onPress={() => navigate("/analyse/import")}
+            onPress={() => { hapticLight(); navigate("/analyse/import"); }}
           >
             <LinearGradient colors={Gradients.brand} style={s.inputIconGrad}>
               <Icon name="camera" size={18} color="#fff" />
@@ -206,6 +310,13 @@ export default function ChatScreen() {
         </View>
 
       </View>
+
+      <UserActionMenu
+        visible={showUserMenu}
+        userId={userId ?? ""}
+        username={partnerName}
+        onClose={() => setShowUserMenu(false)}
+      />
     </KeyboardAvoidingView>
   );
 }

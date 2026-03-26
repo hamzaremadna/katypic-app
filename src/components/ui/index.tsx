@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors, Gradients } from "../../theme/colors";
 import { Fonts } from "../../theme/typography";
 import { Icon, IconName } from "./Icon";
+import { hapticLight, hapticMedium } from "../../utils/haptics";
 
 const { width } = Dimensions.get("window");
 
@@ -35,6 +36,7 @@ interface HeaderProps {
   showBack?: boolean;
   title?: string;
   onBack?: () => void;
+  leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
 }
 
@@ -43,6 +45,7 @@ export function KaytiHeader({
   showBack = false,
   title,
   onBack,
+  leftIcon,
   rightIcon,
 }: HeaderProps) {
   const router = useRouter();
@@ -51,18 +54,34 @@ export function KaytiHeader({
     () => ({ paddingTop: insets.top + 10 }),
     [insets.top],
   );
+
+  const left = leftIcon ?? (showBack ? (
+    <TouchableOpacity
+      onPress={() => { hapticLight(); (onBack || (() => router.back()))(); }}
+      style={header.backBtn}
+    >
+      <Icon name="arrow-left" size={22} color={Colors.textPrimary} />
+    </TouchableOpacity>
+  ) : showSettings ? (
+    <TouchableOpacity
+      style={header.settingsBtn}
+      onPress={() => { hapticLight(); router.push("/(tabs)/settings"); }}
+    >
+      <Icon name="settings" size={20} color={Colors.textPrimary} />
+    </TouchableOpacity>
+  ) : (
+    <View style={spacer.w36} />
+  ));
+
+  const right = rightIcon ?? (!showBack && !showSettings && !leftIcon ? (
+    <View style={spacer.w36} />
+  ) : (
+    <View style={spacer.w36} />
+  ));
+
   return (
     <View style={[header.container, containerPadding]}>
-      {showBack ? (
-        <TouchableOpacity
-          onPress={onBack || (() => router.back())}
-          style={header.backBtn}
-        >
-          <Icon name="arrow-left" size={22} color={Colors.textPrimary} />
-        </TouchableOpacity>
-      ) : (
-        <View style={spacer.w36} />
-      )}
+      {left}
 
       {title ? (
         <Text style={header.title}>{title}</Text>
@@ -73,18 +92,7 @@ export function KaytiHeader({
         </View>
       )}
 
-      {rightIcon ? (
-        rightIcon
-      ) : showSettings ? (
-        <TouchableOpacity
-          style={header.settingsBtn}
-          onPress={() => router.push("/(tabs)/settings")}
-        >
-          <Icon name="settings" size={20} color={Colors.textPrimary} />
-        </TouchableOpacity>
-      ) : (
-        <View style={spacer.w36} />
-      )}
+      {right}
     </View>
   );
 }
@@ -170,7 +178,7 @@ export function BottomTabBar({
               <TouchableOpacity
                 key="camera"
                 style={tabs.cameraWrapper}
-                onPress={() => navigate(tab.route)}
+                onPress={() => { hapticMedium(); navigate(tab.route); }}
               >
                 <View style={tabs.cameraShadow}>
                   <LinearGradient
@@ -189,7 +197,7 @@ export function BottomTabBar({
             <TouchableOpacity
               key={tab.route}
               style={tabs.tab}
-              onPress={() => navigate(tab.route)}
+              onPress={() => { hapticLight(); navigate(tab.route); }}
             >
               <Icon
                 name={tab.icon}
@@ -279,7 +287,7 @@ export function GradientButton({
 }: GradientButtonProps) {
   return (
     <TouchableOpacity
-      onPress={onPress}
+      onPress={() => { if (!disabled) { hapticMedium(); onPress(); } }}
       activeOpacity={disabled ? 1 : 0.85}
       style={[btn.wrapper, style]}
     >
@@ -474,7 +482,7 @@ export function InputField({
           />
           {secureTextEntry && showPasswordToggle && (
             <TouchableOpacity
-              onPress={() => setHidden((h) => !h)}
+              onPress={() => { hapticLight(); setHidden((h) => !h); }}
               hitSlop={10}
               style={inp.eyeBtn}
             >

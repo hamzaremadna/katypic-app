@@ -17,6 +17,7 @@ import { Colors, Gradients } from "../theme/colors";
 import { Fonts } from "../theme/typography";
 import { KaytiHeader } from "../components/ui";
 import { Icon } from "../components/ui/Icon";
+import { hapticLight, hapticMedium } from "../utils/haptics";
 import {
   friendshipApi,
   type FriendItem,
@@ -63,7 +64,7 @@ function FriendCard({
       <TouchableOpacity
         style={fc.profileArea}
         activeOpacity={0.7}
-        onPress={() => navigate(`/profile/${friend.userId}`)}
+        onPress={() => { hapticLight(); navigate(`/profile/${friend.userId}`); }}
       >
         <View style={fc.avatarWrap}>
           <View style={[fc.avatar, { backgroundColor: color }]}>
@@ -261,7 +262,7 @@ function DiscoverCard({
       <TouchableOpacity
         style={dc.profileArea}
         activeOpacity={0.7}
-        onPress={() => navigate(`/profile/${user.userId}`)}
+        onPress={() => { hapticLight(); navigate(`/profile/${user.userId}`); }}
       >
         <View style={[dc.avatar, { backgroundColor: color }]}>
           <Text style={dc.avatarText}>{getInitials(user.displayName)}</Text>
@@ -457,6 +458,7 @@ export default function FriendsScreen() {
   });
 
   const handleSendRequest = (userId: string) => {
+    hapticMedium();
     setPendingAddIds((prev) => new Set(prev).add(userId));
     sendRequestMutation.mutate(userId);
   };
@@ -496,12 +498,14 @@ export default function FriendsScreen() {
         showsHorizontalScrollIndicator={false}
         style={{ flexGrow: 0 }}
         contentContainerStyle={s.tabRow}
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
       >
         {tabs.map((tab) => (
           <TouchableOpacity
             key={tab.key}
             style={[s.tab, activeTab === tab.key && s.tabActive]}
-            onPress={() => setActiveTab(tab.key)}
+            onPress={() => { hapticLight(); setActiveTab(tab.key); }}
             activeOpacity={0.7}
           >
             {activeTab === tab.key && (
@@ -557,6 +561,8 @@ export default function FriendsScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scroll}
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
       >
         {isLoading ? (
           <ActivityIndicator

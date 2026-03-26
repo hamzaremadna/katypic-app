@@ -312,6 +312,8 @@ export default function QuestionnaireScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.optionsScroll}
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
         >
           {question.options.map((option, index) => (
             <OptionCard

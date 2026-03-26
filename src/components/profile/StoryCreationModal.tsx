@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -11,17 +11,20 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
+  PanResponder,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Colors, Gradients } from "@theme/colors";
 import { Fonts } from "@theme/typography";
 import { Icon } from "@components/ui/Icon";
+import { hapticLight, hapticMedium } from "@/utils/haptics";
 import { usePhotos } from "@hooks/usePhotos";
 import { useCreateStory } from "@hooks/useStories";
 import { Photo } from "@services/api/photo.api";
 
 const { width } = Dimensions.get("window");
 const PHOTO_SIZE = (width - 48 - 8) / 3;
+const PREVIEW_HEIGHT = width * 0.6;
 
 interface Props {
   visible: boolean;
@@ -31,13 +34,36 @@ interface Props {
 export function StoryCreationModal({ visible, onClose }: Props) {
   const [title, setTitle] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [storyText, setStoryText] = useState("");
+  // Text position relative to the preview container
+  const textPosRef = useRef({ x: width / 2 - 80, y: PREVIEW_HEIGHT / 2 - 20 });
+  const [textPos, setTextPos] = useState({ x: width / 2 - 80, y: PREVIEW_HEIGHT / 2 - 20 });
+  const [editingText, setEditingText] = useState(false);
 
   const { data: photosData, isLoading: photosLoading } = usePhotos();
   const photos: Photo[] = photosData?.photos ?? [];
 
   const createStory = useCreateStory();
 
+  // PanResponder for dragging the story text overlay
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, gs) => {
+        textPosRef.current = {
+          x: textPosRef.current.x + gs.dx,
+          y: textPosRef.current.y + gs.dy,
+        };
+      },
+      onPanResponderRelease: () => {
+        setTextPos({ ...textPosRef.current });
+      },
+    })
+  ).current;
+
   const togglePhoto = useCallback((id: string) => {
+    hapticLight();
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -50,6 +76,7 @@ export function StoryCreationModal({ visible, onClose }: Props) {
   }, []);
 
   const handleCreate = async () => {
+    hapticMedium();
     if (!title.trim()) {
       Alert.alert("Titre requis", "Donne un nom à ta sélection.");
       return;
@@ -65,6 +92,10 @@ export function StoryCreationModal({ visible, onClose }: Props) {
       });
       setTitle("");
       setSelectedIds(new Set());
+      setStoryText("");
+      const resetPos = { x: width / 2 - 80, y: PREVIEW_HEIGHT / 2 - 20 };
+      textPosRef.current = resetPos;
+      setTextPos(resetPos);
       onClose();
     } catch {
       Alert.alert("Erreur", "Impossible de créer la sélection.");
@@ -72,10 +103,18 @@ export function StoryCreationModal({ visible, onClose }: Props) {
   };
 
   const handleClose = () => {
+    hapticLight();
     setTitle("");
     setSelectedIds(new Set());
+    setStoryText("");
+    const resetPos = { x: width / 2 - 80, y: PREVIEW_HEIGHT / 2 - 20 };
+    textPosRef.current = resetPos;
+    setTextPos(resetPos);
     onClose();
   };
+
+  // First selected photo for preview
+  const firstSelectedPhoto = photos.find((p) => selectedIds.has(p.id));
 
   const renderPhoto = ({ item }: { item: Photo }) => {
     const isSelected = selectedIds.has(item.id);
@@ -142,6 +181,71 @@ export function StoryCreationModal({ visible, onClose }: Props) {
           <Text style={s.charCount}>{title.length}/30</Text>
         </View>
 
+        {/* Story text preview (shows when photos selected) */}
+        {firstSelectedPhoto && (
+          <View style={s.previewSection}>
+            <Text style={s.inputLabel}>TEXTE SUR LA STORY</Text>
+            <View style={s.previewWrap}>
+              <Image
+                source={{ uri: firstSelectedPhoto.thumbnailUrl ?? firstSelectedPhoto.url }}
+                style={s.previewImage}
+                resizeMode="cover"
+              />
+              {/* Dark overlay for readability */}
+              <View style={s.previewDim} />
+
+              {/* Draggable text overlay */}
+              {storyText.trim().length > 0 && (
+                <View
+                  style={[s.textOverlay, { left: textPos.x, top: textPos.y }]}
+                  {...panResponder.panHandlers}
+                >
+                  <Text style={s.overlayText}>{storyText}</Text>
+                </View>
+              )}
+
+              {/* Edit text button */}
+              <TouchableOpacity
+                style={s.editTextBtn}
+                onPress={() => { hapticLight(); setEditingText(true); }}
+                activeOpacity={0.8}
+              >
+                <Icon name="pen" size={14} color="#fff" />
+                <Text style={s.editTextBtnLabel}>
+                  {storyText.trim() ? "Modifier le texte" : "Ajouter un texte"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {storyText.trim().length > 0 && (
+              <Text style={s.dragHint}>Faites glisser le texte pour le repositionner</Text>
+            )}
+          </View>
+        )}
+
+        {/* Inline text editor overlay */}
+        {editingText && (
+          <Modal visible transparent animationType="fade">
+            <View style={s.textEditorBg}>
+              <TextInput
+                style={s.textEditorInput}
+                value={storyText}
+                onChangeText={setStoryText}
+                placeholder="Écrire sur la photo..."
+                placeholderTextColor="rgba(255,255,255,0.5)"
+                multiline
+                autoFocus
+                maxLength={100}
+              />
+              <TouchableOpacity
+                style={s.textEditorDone}
+                onPress={() => { hapticLight(); setEditingText(false); }}
+              >
+                <Text style={s.textEditorDoneText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </Modal>
+        )}
+
         {/* Photos section */}
         <Text style={s.photosLabel}>
           CHOISIR DES PHOTOS{" "}
@@ -167,6 +271,8 @@ export function StoryCreationModal({ visible, onClose }: Props) {
             columnWrapperStyle={s.photoRow}
             contentContainerStyle={s.photoGrid}
             showsVerticalScrollIndicator={false}
+            keyboardDismissMode="interactive"
+            keyboardShouldPersistTaps="handled"
           />
         )}
 
@@ -234,7 +340,7 @@ const s = StyleSheet.create({
   },
   inputSection: {
     paddingHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   inputLabel: {
     fontFamily: Fonts.bold,
@@ -261,6 +367,102 @@ const s = StyleSheet.create({
     textAlign: "right",
     marginTop: 6,
   },
+
+  // Story text preview
+  previewSection: {
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  previewWrap: {
+    height: PREVIEW_HEIGHT,
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: Colors.bgCard,
+  },
+  previewImage: {
+    width: "100%",
+    height: "100%",
+  },
+  previewDim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+  textOverlay: {
+    position: "absolute",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderRadius: 8,
+    maxWidth: width - 80,
+  },
+  overlayText: {
+    fontFamily: Fonts.bold,
+    fontSize: 18,
+    color: "#fff",
+    textShadowColor: "rgba(0,0,0,0.6)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  editTextBtn: {
+    position: "absolute",
+    bottom: 12,
+    right: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  editTextBtnLabel: {
+    fontFamily: Fonts.medium,
+    fontSize: 12,
+    color: "#fff",
+  },
+  dragHint: {
+    fontFamily: Fonts.regular,
+    fontSize: 11,
+    color: Colors.textMuted,
+    textAlign: "center",
+    marginTop: 6,
+  },
+
+  // Full-screen text editor
+  textEditorBg: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    gap: 20,
+  },
+  textEditorInput: {
+    fontFamily: Fonts.bold,
+    fontSize: 22,
+    color: "#fff",
+    textAlign: "center",
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    width: "100%",
+    maxHeight: 160,
+  },
+  textEditorDone: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 40,
+    paddingVertical: 14,
+    borderRadius: 50,
+  },
+  textEditorDoneText: {
+    fontFamily: Fonts.bold,
+    fontSize: 16,
+    color: "#000",
+  },
+
   photosLabel: {
     fontFamily: Fonts.bold,
     fontSize: 11,

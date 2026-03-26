@@ -25,6 +25,7 @@ import * as Location from "expo-location";
 import { Colors, Gradients } from "../theme/colors";
 import { Icon, type IconName } from "../components/ui/Icon";
 import { profileApi } from "../services/api/profile.api";
+import { hapticLight, hapticMedium } from "../utils/haptics";
 import { useAuthStore } from "../stores/authStore";
 
 // ─── Helpers ──────────────────────────────────────────────
@@ -212,6 +213,7 @@ export default function EditProfileScreen() {
   };
 
   const handleTogglePublic = (val: boolean) => {
+    hapticLight();
     setIsPublic(val);
     profileApi.updateProfile({ isPublic: val });
   };
@@ -283,13 +285,13 @@ export default function EditProfileScreen() {
 
         {/* ── Header ── */}
         <View style={s.header}>
-          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+          <TouchableOpacity style={s.backBtn} onPress={() => { hapticLight(); router.back(); }}>
             <Icon name="arrow-left" size={22} color={Colors.textPrimary} />
           </TouchableOpacity>
           <Text style={s.headerTitle}>Modifier le profil</Text>
           <TouchableOpacity
             style={[s.saveBtn, isSaving && s.saveBtnDisabled]}
-            onPress={handleSaveAll}
+            onPress={() => { hapticMedium(); handleSaveAll(); }}
             disabled={isSaving}
           >
             {isSaving ? (
@@ -309,13 +311,14 @@ export default function EditProfileScreen() {
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={s.scroll}
+            keyboardDismissMode="interactive"
             keyboardShouldPersistTaps="handled"
           >
             {/* ── Avatar ── */}
             <View style={s.avatarSection}>
               <TouchableOpacity
                 style={s.avatarWrap}
-                onPress={handlePickAvatar}
+                onPress={() => { hapticLight(); handlePickAvatar(); }}
                 disabled={avatarUploading}
                 activeOpacity={0.8}
               >
@@ -355,7 +358,7 @@ export default function EditProfileScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={handlePickAvatar}
+                onPress={() => { hapticLight(); handlePickAvatar(); }}
                 disabled={avatarUploading}
                 style={s.changePhotoBtn}
               >
@@ -365,7 +368,7 @@ export default function EditProfileScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => navigate("/avatar-picker")}
+                onPress={() => { hapticLight(); navigate("/avatar-picker"); }}
                 style={s.changePhotoBtn}
               >
                 <Text style={s.changePhotoText}>Choisir un emoji avatar</Text>
@@ -453,7 +456,7 @@ export default function EditProfileScreen() {
                     </View>
                     <TouchableOpacity
                       style={s.modifierBtn}
-                      onPress={() => setEditingLocation(false)}
+                      onPress={() => { hapticLight(); setEditingLocation(false); }}
                     >
                       <Text style={s.modifierText}>OK</Text>
                     </TouchableOpacity>
@@ -473,7 +476,7 @@ export default function EditProfileScreen() {
                     </View>
                     <TouchableOpacity
                       style={s.modifierBtn}
-                      onPress={handleUpdateLocation}
+                      onPress={() => { hapticLight(); handleUpdateLocation(); }}
                     >
                       <Text style={s.modifierText}>Modifier</Text>
                     </TouchableOpacity>
@@ -518,7 +521,7 @@ export default function EditProfileScreen() {
                     {i > 0 && <View style={s.rowDivider} />}
                     <TouchableOpacity
                       style={s.levelRow}
-                      onPress={() => setLevel(opt.id)}
+                      onPress={() => { hapticLight(); setLevel(opt.id); }}
                       activeOpacity={0.7}
                     >
                       <View
@@ -554,7 +557,7 @@ export default function EditProfileScreen() {
                       <View key={tag} style={s.tag}>
                         <Text style={s.tagText}>{tag}</Text>
                         <TouchableOpacity
-                          onPress={() => removeTag(tag)}
+                          onPress={() => { hapticLight(); removeTag(tag); }}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         >
                           <Text style={s.tagRemove}>×</Text>
@@ -576,7 +579,7 @@ export default function EditProfileScreen() {
                   />
                   <TouchableOpacity
                     style={s.addTagBtn}
-                    onPress={() => addTag(tagInput)}
+                    onPress={() => { hapticLight(); addTag(tagInput); }}
                   >
                     <LinearGradient
                       colors={Gradients.brand}
@@ -596,7 +599,7 @@ export default function EditProfileScreen() {
                     <TouchableOpacity
                       key={sug}
                       style={s.suggestionPill}
-                      onPress={() => addTag(sug)}
+                      onPress={() => { hapticLight(); addTag(sug); }}
                     >
                       <Text style={s.suggestionText}>+ {sug}</Text>
                     </TouchableOpacity>
@@ -629,13 +632,14 @@ export default function EditProfileScreen() {
             {/* ── Zone de danger ── */}
             <View style={s.section}>
               <Text style={s.dangerTitle}>Zone de danger</Text>
-              <TouchableOpacity style={s.logoutBtn} onPress={handleLogout}>
+              <TouchableOpacity style={s.logoutBtn} onPress={() => { hapticLight(); handleLogout(); }}>
                 <Icon name="log-out" size={16} color="#FF6B6B" />
                 <Text style={s.logoutText}>Se déconnecter</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={s.deleteBtn}
-                onPress={() =>
+                onPress={() => {
+                  hapticLight();
                   Alert.alert(
                     "Supprimer le compte",
                     "Cette action est irréversible. Toutes vos données seront supprimées définitivement.",
@@ -647,8 +651,8 @@ export default function EditProfileScreen() {
                         onPress: handleLogout,
                       },
                     ]
-                  )
-                }
+                  );
+                }}
               >
                 <Text style={s.deleteText}>Supprimer mon compte</Text>
               </TouchableOpacity>

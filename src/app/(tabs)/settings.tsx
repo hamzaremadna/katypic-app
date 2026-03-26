@@ -22,6 +22,7 @@ import { BottomTabBar } from "../../components/ui";
 import { Icon, type IconName } from "../../components/ui/Icon";
 import { useAuthStore } from "../../stores/authStore";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { hapticLight, hapticHeavy } from "../../utils/haptics";
 import { profileApi } from "../../services/api/profile.api";
 import { authApi } from "../../services/api/auth.api";
 
@@ -103,6 +104,7 @@ export default function SettingsScreen() {
 
   const handleTogglePublic = useCallback(
     (val: boolean) => {
+      hapticLight();
       setIsPublic(val);
       if (toggleTimer.current) clearTimeout(toggleTimer.current);
       toggleTimer.current = setTimeout(() => {
@@ -123,6 +125,7 @@ export default function SettingsScreen() {
   );
 
   const handleLogout = useCallback(() => {
+    hapticLight();
     Alert.alert(
       "Se déconnecter",
       "Êtes-vous sûr de vouloir vous déconnecter ?",
@@ -132,6 +135,7 @@ export default function SettingsScreen() {
           text: "Déconnexion",
           style: "destructive",
           onPress: async () => {
+            hapticHeavy();
             await logout();
             router.replace("/(auth)/login");
           },
@@ -141,6 +145,7 @@ export default function SettingsScreen() {
   }, [logout, router]);
 
   const handleDeleteAccount = useCallback(() => {
+    hapticLight();
     Alert.alert(
       "Supprimer le compte",
       "Cette action est irréversible. Toutes vos données, photos et analyses seront supprimées définitivement.",
@@ -150,6 +155,7 @@ export default function SettingsScreen() {
           text: "Supprimer",
           style: "destructive",
           onPress: async () => {
+            hapticHeavy();
             try {
               await authApi.deleteAccount();
               await logout();
@@ -164,6 +170,7 @@ export default function SettingsScreen() {
   }, [logout, router]);
 
   const handleRateApp = useCallback(async () => {
+    hapticLight();
     try {
       const StoreReview = await import("expo-store-review");
       if (await StoreReview.isAvailableAsync()) {
@@ -181,6 +188,7 @@ export default function SettingsScreen() {
   }, []);
 
   const handlePasswordReset = useCallback(() => {
+    hapticLight();
     Alert.alert(
       "Mot de passe",
       "Pour modifier votre mot de passe, un email de réinitialisation vous sera envoyé.",
@@ -208,6 +216,7 @@ export default function SettingsScreen() {
   }, [authUser?.email]);
 
   const handlePersonalData = useCallback(() => {
+    hapticLight();
     Alert.alert(
       "Données personnelles",
       "Vos données sont stockées de façon sécurisée. Pour une demande de suppression ou d'export, contactez-nous à privacy@kaytipic.com.",
@@ -222,24 +231,28 @@ export default function SettingsScreen() {
   }, []);
 
   const handleOpenCGU = useCallback(() => {
+    hapticLight();
     Linking.openURL("https://kaytipic.com/cgu").catch(() =>
       Alert.alert("Erreur", "Impossible d'ouvrir les conditions d'utilisation.")
     );
   }, []);
 
   const handleOpenPrivacy = useCallback(() => {
+    hapticLight();
     Linking.openURL("https://kaytipic.com/privacy").catch(() =>
       Alert.alert("Erreur", "Impossible d'ouvrir la politique de confidentialité.")
     );
   }, []);
 
   const handleOpenHelp = useCallback(() => {
+    hapticLight();
     Linking.openURL("https://kaytipic.com/aide").catch(() =>
       Alert.alert("Erreur", "Impossible d'ouvrir le centre d'aide.")
     );
   }, []);
 
   const handleContact = useCallback(() => {
+    hapticLight();
     Linking.openURL(
       "mailto:support@kaytipic.com?subject=Support%20KaytiPic"
     ).catch(() =>
@@ -248,10 +261,12 @@ export default function SettingsScreen() {
   }, []);
 
   const handleGoToEditProfile = useCallback(() => {
+    hapticLight();
     navigate("/edit-profile");
   }, []);
 
   const handleGoToPaywall = useCallback(() => {
+    hapticLight();
     navigate("/paywall/intro");
   }, []);
 
@@ -271,7 +286,7 @@ export default function SettingsScreen() {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
         />
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity style={s.backBtn} onPress={() => { hapticLight(); router.back(); }}>
           <Icon name="arrow-left" size={22} color="#fff" />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Paramètres</Text>
@@ -283,6 +298,8 @@ export default function SettingsScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scroll}
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
       >
         {/* ── COMPTE ── */}
         <SectionLabel title="COMPTE" />

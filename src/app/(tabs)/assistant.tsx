@@ -21,6 +21,7 @@ import type { ChatMessage } from "@services/api/ai.api";
 import { ChatBubbleList } from "@components/assistant/ChatBubble";
 import { SuggestionChips } from "@components/assistant/SuggestionChips";
 import { VoiceRecordingModal } from "@components/assistant/VoiceInput";
+import { hapticLight, hapticMedium } from "../../utils/haptics";
 
 // Message sent when user taps the sparkles button to request a suggestion
 const SUGGEST_PROMPT = "Suggère-moi un exercice photo à pratiquer aujourd'hui.";
@@ -123,6 +124,7 @@ export default function AssistantScreen() {
 
   const handleQuestionPress = useCallback(
     (index: number, question: string) => {
+      hapticLight();
       setSelectedQuestion(index);
       handleSend(question);
     },
@@ -137,6 +139,7 @@ export default function AssistantScreen() {
 
   // Start a brand-new conversation
   const handleNewSession = useCallback(() => {
+    hapticLight();
     Alert.alert(
       "Nouvelle conversation",
       "Effacer la conversation et en démarrer une nouvelle ?",
@@ -158,7 +161,7 @@ export default function AssistantScreen() {
     );
   }, [initSession, clearError]);
 
-  const handleOpenVoice = useCallback(() => setShowVoice(true), []);
+  const handleOpenVoice = useCallback(() => { hapticLight(); setShowVoice(true); }, []);
   const handleCloseVoice = useCallback(() => setShowVoice(false), []);
 
   const handleContentSizeChange = useCallback(() => {
@@ -168,6 +171,7 @@ export default function AssistantScreen() {
   }, [hasMessages]);
 
   const handleSubmitInput = useCallback(() => {
+    hapticMedium();
     handleSend(inputText);
   }, [handleSend, inputText]);
 
@@ -202,6 +206,8 @@ export default function AssistantScreen() {
           contentContainerStyle={s.scrollContent}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={handleContentSizeChange}
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
         >
           {/* Greeting — shown only before first message */}
           {!hasMessages && (

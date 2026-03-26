@@ -25,6 +25,7 @@ import { useTourStore } from "../../stores/tourStore";
 import { useToggleFavorite } from "../../hooks/useSpots";
 import { spotApi, Spot as ApiSpot } from "../../services/api/spot.api";
 import { eventApi, Event as ApiEvent } from "../../services/api/event.api";
+import { hapticLight, hapticMedium } from "../../utils/haptics";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -181,6 +182,7 @@ export default function DiscoverScreen() {
   const currentItem = currentData[currentCardIndex] ?? null;
 
   const handleTabChange = useCallback((tab: TabType) => {
+    hapticLight();
     setActiveTab(tab);
     setCurrentCardIndex(0);
   }, []);
@@ -194,6 +196,7 @@ export default function DiscoverScreen() {
 
   const goToNextCard = useCallback(() => {
     if (currentData.length === 0) return;
+    hapticLight();
     setCurrentCardIndex((prev) => {
       const next = prev < currentData.length - 1 ? prev + 1 : 0;
       animateTo(currentData[next]);
@@ -203,6 +206,7 @@ export default function DiscoverScreen() {
 
   const goToPreviousCard = useCallback(() => {
     if (currentData.length === 0) return;
+    hapticLight();
     setCurrentCardIndex((prev) => {
       const next = prev > 0 ? prev - 1 : currentData.length - 1;
       animateTo(currentData[next]);
@@ -212,6 +216,7 @@ export default function DiscoverScreen() {
 
   const handleMarkerPress = useCallback(
     (index: number) => {
+      hapticLight();
       setCurrentCardIndex(index);
       animateTo(currentData[index]);
     },
@@ -219,11 +224,13 @@ export default function DiscoverScreen() {
   );
 
   const handleToggleMapType = useCallback(() => {
+    hapticLight();
     setMapType((prev) => (prev === "standard" ? "satellite" : "standard"));
   }, []);
 
   const handleViewItem = useCallback(() => {
     if (!currentItem) return;
+    hapticLight();
     navigate(
       activeTab === "spots"
         ? `/spot/${currentItem.id}`
@@ -233,11 +240,13 @@ export default function DiscoverScreen() {
 
   const handleShareItem = useCallback(() => {
     if (!currentItem) return;
+    hapticLight();
     Share.share({ message: `${currentItem.name} — découvert sur KaytiPic` });
   }, [currentItem]);
 
   const handleToggleLike = useCallback(() => {
     if (!currentItem) return;
+    hapticLight();
     setLikedIds((prev) => {
       const next = new Set(prev);
       next.has(currentItem.id) ? next.delete(currentItem.id) : next.add(currentItem.id);
@@ -250,6 +259,7 @@ export default function DiscoverScreen() {
   }, [currentItem, activeTab, toggleFavorite]);
 
   const handleGoToActivites = useCallback(() => {
+    hapticMedium();
     navigate("/activites");
   }, []);
 

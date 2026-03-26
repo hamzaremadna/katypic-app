@@ -144,7 +144,7 @@ export default function LoginScreen() {
         <StatusBar style="light" />
         <LinearGradient colors={["#0E0824", "#080814"]} style={StyleSheet.absoluteFillObject} />
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll} keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled">
           <KaytiHeader />
 
           <View style={s.content}>

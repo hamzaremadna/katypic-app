@@ -28,6 +28,7 @@ import { Story } from "../../services/api/story.api";
 import { useMyStories } from "../../hooks/useStories";
 import { StoryCreationModal } from "../../components/profile/StoryCreationModal";
 import { StoryViewer } from "../../components/profile/StoryViewer";
+import { hapticLight } from "../../utils/haptics";
 
 const { width } = Dimensions.get("window");
 const PHOTO_SIZE = (width - 40 - 8) / 3;
@@ -177,7 +178,7 @@ export default function ProfileScreen() {
     () =>
       creative?.visualPreferences?.length
         ? creative.visualPreferences.slice(0, 5).map((t) => `#${t}`)
-        : ["#Paysages", "#Voyage", "#Portrait", "#Macro"],
+        : [],
     [creative?.visualPreferences],
   );
 
@@ -187,22 +188,27 @@ export default function ProfileScreen() {
   );
 
   const handleGoToEditProfile = useCallback(() => {
+    hapticLight();
     navigate("/edit-profile");
   }, []);
 
   const handleGoToMessages = useCallback(() => {
+    hapticLight();
     navigate("/messages");
   }, []);
 
   const handleGoToFriends = useCallback(() => {
+    hapticLight();
     navigate("/friends");
   }, []);
 
   const handleSetPhotosTab = useCallback(() => {
+    hapticLight();
     setActiveTab("photos");
   }, []);
 
   const handleSetAmisTab = useCallback(() => {
+    hapticLight();
     setActiveTab("amis");
   }, []);
 
@@ -214,6 +220,8 @@ export default function ProfileScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scroll}
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={false}
@@ -331,30 +339,34 @@ export default function ProfileScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={s.storiesRow}
+            keyboardDismissMode="interactive"
+            keyboardShouldPersistTaps="handled"
           >
             {/* "Nouveau+" button always first */}
             <StoryCircle
               story={{ id: "new", isAdd: true }}
-              onPress={() => setShowCreateModal(true)}
+              onPress={() => { hapticLight(); setShowCreateModal(true); }}
             />
             {myStories.map((story) => (
               <StoryCircle
                 key={story.id}
                 story={story}
-                onPress={() => setViewerStory(story)}
+                onPress={() => { hapticLight(); setViewerStory(story); }}
               />
             ))}
           </ScrollView>
         </View>
 
         {/* ── Hashtags (from specialties) ── */}
-        <View style={s.hashtagRow}>
-          {hashtags.map((tag) => (
-            <View key={tag} style={s.hashtagPill}>
-              <Text style={s.hashtagText}>{tag}</Text>
-            </View>
-          ))}
-        </View>
+        {hashtags.length > 0 && (
+          <View style={s.hashtagRow}>
+            {hashtags.map((tag) => (
+              <View key={tag} style={s.hashtagPill}>
+                <Text style={s.hashtagText}>{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* ── Tab selector ── */}
         <View style={s.tabSelector}>
@@ -403,12 +415,13 @@ export default function ProfileScreen() {
                 <TouchableOpacity
                   key={photo.id}
                   style={s.photoItem}
-                  onPress={() =>
+                  onPress={() => {
+                    hapticLight();
                     router.push({
                       pathname: "/gallery/[photoId]",
                       params: { photoId: photo.id, photoUri: photo.url },
-                    })
-                  }
+                    });
+                  }}
                 >
                   <Image
                     source={{ uri: photo.url }}
