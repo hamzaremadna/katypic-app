@@ -58,6 +58,9 @@ export const eventApi = {
 
   getPendingRequests: () => api.get<EventJoinRequest[]>("/events/pending"),
 
+  getCoverUploadUrl: () =>
+    api.get<{ uploadUrl: string; coverUrl: string }>("/events/cover-upload-url"),
+
   create: (data: {
     title: string;
     description?: string;
@@ -71,6 +74,8 @@ export const eventApi = {
     coverImageUrl?: string;
     level?: EventLevel;
     isPublic?: boolean;
+    photoType?: string;
+    hasModel?: boolean;
   }) => api.post<Event>("/events", data),
 
   join: (eventId: string) => api.post(`/events/${eventId}/join`),
