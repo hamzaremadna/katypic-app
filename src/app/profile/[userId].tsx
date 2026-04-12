@@ -347,11 +347,19 @@ export default function PublicProfileScreen() {
             </View>
           ) : (
             <View style={s.photoGrid}>
-              {photos.map((photo: { id: string; url?: string }) => (
+              {photos.map((photo: { id: string; url?: string; caption?: string }) => (
                 <TouchableOpacity
                   key={photo.id}
                   style={s.photoItem}
                   activeOpacity={0.85}
+                  onPress={() => {
+                    if (photo.url) {
+                      router.push({
+                        pathname: "/gallery/[photoId]",
+                        params: { photoId: photo.id, photoUri: photo.url },
+                      } as never);
+                    }
+                  }}
                 >
                   {photo.url ? (
                     <Image

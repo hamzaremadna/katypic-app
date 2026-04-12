@@ -20,7 +20,7 @@ import { Colors, Gradients } from "../../theme/colors";
 import { Fonts } from "../../theme/typography";
 import { KaytiHeader } from "../../components/ui";
 import { Icon } from "../../components/ui/Icon";
-import { useDeletePhoto } from "../../hooks/usePhotos";
+import { useDeletePhoto, usePhoto } from "../../hooks/usePhotos";
 import { hapticLight, hapticMedium, hapticHeavy } from "../../utils/haptics";
 
 const { width, height } = Dimensions.get("window");
@@ -214,6 +214,7 @@ export default function GalleryPhotoViewScreen() {
   const photoId = params.photoId ?? "";
 
   const deletePhoto = useDeletePhoto();
+  const { data: photo } = usePhoto(photoId);
   const [showShareModal, setShowShareModal] = useState(false);
 
   const handleImport = () => {
@@ -289,6 +290,13 @@ export default function GalleryPhotoViewScreen() {
         )}
       </View>
 
+      {/* Caption */}
+      {photo?.caption ? (
+        <View style={s.captionWrap}>
+          <Text style={s.captionText}>{photo.caption}</Text>
+        </View>
+      ) : null}
+
       {/* Action buttons row */}
       <View style={s.actionsRow}>
         <TouchableOpacity style={s.actionItem} onPress={handleAnalyse}>
@@ -362,6 +370,16 @@ const s = StyleSheet.create({
     backgroundColor: "#0A0A14",
   },
   photo: { width: "100%", height: "100%" },
+  captionWrap: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  captionText: {
+    fontFamily: Fonts.regular,
+    fontSize: 14,
+    color: Colors.textPrimary,
+    lineHeight: 20,
+  },
   placeholder: {
     flex: 1,
     alignItems: "center",
