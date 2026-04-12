@@ -24,10 +24,8 @@ import { useTourStore } from "../../stores/tourStore";
 import { AssistantModeModal } from "../../components/camera/AssistantModeModal";
 import { AiTipOverlay } from "../../components/camera/AiTipOverlay";
 import type { AssistantMode } from "../../components/camera/AssistantModeModal";
-import { aiApi } from "../../services/api/ai.api";
 import { hapticLight, hapticMedium } from "../../utils/haptics";
-import { readAsStringAsync, deleteAsync } from "expo-file-system/legacy";
-import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
+import { useCameraTip } from "../../hooks/useCameraTip";
 
 const { width, height } = Dimensions.get("window");
 
@@ -341,94 +339,25 @@ export default function CameraScreen() {
 
   // ── AI Assistant ───────────────────────────────────────
   const [showModeModal, setShowModeModal] = useState(false);
-  const [assistantActive, setAssistantActive] = useState(false);
-  const [assistantMode, setAssistantMode] = useState<AssistantMode>("text");
-  const [assistantIntensity, setAssistantIntensity] = useState(60);
-  const [currentTip, setCurrentTip] = useState<{ tip: string; category: string; alert?: string } | null>(null);
-  const [showTipOverlay, setShowTipOverlay] = useState(false);
-  const tipIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  /** intensity 20–100 → poll interval 30s–8s */
-  const intensityToMs = (intensity: number) =>
-    Math.round(30000 - ((intensity - 20) / 80) * 22000);
-
-  const FALLBACK_TIPS = [
-    { alert: "Sous-exposition", tip: "La scène est trop sombre — cherchez plus de lumière ou activez le flash.", category: "lumiere" },
-    { alert: "Horizon penché", tip: "Inclinez légèrement votre téléphone pour redresser l'horizon.", category: "technique" },
-    { alert: "Sujet trop loin", tip: "Faites deux pas vers votre sujet pour remplir davantage le cadre.", category: "composition" },
-    { alert: "Contre-jour", tip: "Repositionnez-vous pour avoir la source de lumière dans le dos.", category: "lumiere" },
-    { alert: "Cadrage déséquilibré", tip: "Déplacez votre sujet vers une intersection des lignes du tiers.", category: "composition" },
-    { alert: "Belle lumière ✓", tip: "La lumière est bonne — essayez simplement de varier votre angle.", category: "lumiere" },
-  ];
-
-  const fetchTip = useCallback(async () => {
-    if (!cameraRef.current) return;
-    try {
-      // Capture frame (skipProcessing: false ensures JPEG, not HEIC on iOS)
-      // saveToPhotos: false prevents saving to device camera roll
-      const frame = await cameraRef.current.takePictureAsync({
-        quality: 0.8,
-        skipProcessing: false,
-      } as Parameters<typeof cameraRef.current.takePictureAsync>[0]);
-      if (!frame?.uri) return;
-
-      // Resize to max 512px wide at quality 0.6 — reduces payload from ~3MB to ~40KB
-      // This cuts latency from 3–5s to ~1s and reduces Gemini token cost 10x
-      const resized = await manipulateAsync(
-        frame.uri,
-        [{ resize: { width: 512 } }],
-        { compress: 0.6, format: SaveFormat.JPEG }
-      );
-
-      // Cleanup original full-size frame immediately
-      deleteAsync(frame.uri, { idempotent: true }).catch(() => {});
-
-      // Read resized image as base64
-      const base64 = await readAsStringAsync(resized.uri, { encoding: "base64" });
-      deleteAsync(resized.uri, { idempotent: true }).catch(() => {});
-
-      const response = await aiApi.getCameraTip(base64, "image/jpeg");
-      setCurrentTip(response.data);
-      setShowTipOverlay(true);
-    } catch {
-      // API down or capture failed — show a local fallback tip so user always gets something
-      const fallback = FALLBACK_TIPS[Math.floor(Math.random() * FALLBACK_TIPS.length)];
-      setCurrentTip(fallback);
-      setShowTipOverlay(true);
-    }
-  }, []);
+  const {
+    currentTip,
+    showTipOverlay,
+    setShowTipOverlay,
+    assistantActive,
+    assistantMode,
+    assistantIntensity,
+    startAssistant: startAssistantHook,
+    stopAssistant,
+  } = useCameraTip(cameraRef);
 
   const startAssistant = useCallback(
     (mode: AssistantMode, intensity: number) => {
-      setAssistantMode(mode);
-      setAssistantIntensity(intensity);
-      setAssistantActive(true);
       setShowModeModal(false);
-
-      // Fetch first tip immediately, then poll
-      fetchTip();
-      const ms = intensityToMs(intensity);
-      tipIntervalRef.current = setInterval(fetchTip, ms);
+      startAssistantHook(mode, intensity);
     },
-    [fetchTip],
+    [startAssistantHook],
   );
 
-  const stopAssistant = useCallback(() => {
-    if (tipIntervalRef.current) {
-      clearInterval(tipIntervalRef.current);
-      tipIntervalRef.current = null;
-    }
-    setAssistantActive(false);
-    setShowTipOverlay(false);
-    setCurrentTip(null);
-  }, []);
-
-  // Clean up interval on unmount
-  useEffect(() => {
-    return () => {
-      if (tipIntervalRef.current) clearInterval(tipIntervalRef.current);
-    };
-  }, []);
 
   // Capture button animation
   const captureScale = useRef(new Animated.Value(1)).current;

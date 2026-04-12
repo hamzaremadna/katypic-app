@@ -25,8 +25,8 @@ import { useAuthStore } from "../../stores/authStore";
 import { usePhotos } from "../../hooks/usePhotos";
 import { useQuestPaths } from "../../hooks/useQuestPaths";
 import { useDailyTip } from "../../hooks/useDailyTip";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { notificationApi } from "../../services/api/notification.api";
+import { useQueryClient } from "@tanstack/react-query";
+import { useUnreadNotifications } from "../../hooks/useUnreadNotifications";
 import { hapticLight, hapticMedium } from "../../utils/haptics";
 
 // Card background images
@@ -459,12 +459,7 @@ export default function HomeScreen() {
     }).start();
   }, []);
 
-  const { data: notifData } = useQuery({
-    queryKey: ["notifUnread"],
-    queryFn: () => notificationApi.getUnreadCount().then((r) => r.data),
-    refetchInterval: 30000,
-  });
-  const unreadNotifCount = notifData?.count ?? 0;
+  const unreadNotifCount = useUnreadNotifications();
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
