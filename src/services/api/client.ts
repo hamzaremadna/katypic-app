@@ -9,6 +9,10 @@ const _rawApiUrl =
 // Ensure the base URL always ends with /api regardless of how the env var is set
 const API_BASE = _rawApiUrl.replace(/\/api\/?$/, "") + "/api";
 
+const REQUEST_TIMEOUT_MS = 15_000;
+const MAX_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 1_000;
+
 // ── snake_case → camelCase transform for Prisma responses ──
 function snakeToCamel(str: string): string {
   return str.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
@@ -33,7 +37,7 @@ function transformKeys(obj: unknown): unknown {
 // Named exports: `apiClient` for stores, `api` for service modules
 export const apiClient = axios.create({
   baseURL: API_BASE,
-  timeout: 15000,
+  timeout: REQUEST_TIMEOUT_MS,
   headers: { "Content-Type": "application/json" },
 });
 
@@ -46,9 +50,6 @@ apiClient.interceptors.request.use(async (config) => {
 });
 
 // ── Retry on network errors (not 4xx/5xx) ──
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 1000;
-
 apiClient.interceptors.response.use(
   // Transform snake_case API responses to camelCase
   (response) => {
@@ -85,7 +86,7 @@ apiClient.interceptors.response.use(
     }
 
     config.__retryCount += 1;
-    const delay = RETRY_DELAY_MS * Math.pow(2, config.__retryCount - 1);
+    const delay = RETRY_BASE_DELAY_MS * Math.pow(2, config.__retryCount - 1);
     await new Promise((resolve) => setTimeout(resolve, delay));
 
     return apiClient(config);

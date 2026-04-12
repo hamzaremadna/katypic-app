@@ -3,6 +3,8 @@ import { Image, Platform } from "react-native";
 import { photoApi, Photo } from "../services/api/photo.api";
 import { api } from "../services/api/client";
 
+const S3_UPLOAD_TIMEOUT_MS = 30_000;
+
 function getImageDimensions(
   uri: string,
 ): Promise<{ width: number; height: number }> {
@@ -77,7 +79,7 @@ export function useUploadPhoto() {
       } else {
         // ── Production: S3 presigned PUT URL ──
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        const timeoutId = setTimeout(() => controller.abort(), S3_UPLOAD_TIMEOUT_MS);
 
         try {
           const fileResp = await fetch(photoUri);
