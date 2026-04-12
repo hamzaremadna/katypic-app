@@ -364,7 +364,6 @@ export default function AnalyseResultScreen() {
         setPipelineStep("done");
         hapticSuccess(); // analysis complete — triple beat
       } catch (err) {
-        console.warn("Pipeline error:", err);
         const msg =
           err instanceof Error ? err.message : "Erreur inconnue";
         setErrorMessage(msg);

@@ -25,7 +25,7 @@ import { Icon } from "../../components/ui/Icon";
 import { usePhotos } from "../../hooks/usePhotos";
 import { Image as RNImage } from "react-native";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 
 // AI Selection modal - "Sélection intelligente"
 function AISelectionModal({
@@ -97,7 +97,7 @@ function AISelectionModal({
           <Text style={m.subtitle}>L'IA peut détecter automatiquement :</Text>
 
           <View style={m.typeList}>
-            {types.map((t, i) => (
+            {types.map((t) => (
               <TouchableOpacity
                 key={t.id}
                 style={[m.typeRow, selectedType === t.id && m.typeRowSelected]}
@@ -161,9 +161,7 @@ const m = StyleSheet.create({
     justifyContent: "center",
     zIndex: 5,
   },
-  closeIcon: { color: Colors.textSecondary, fontSize: 16 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  titleIcon: { color: Colors.accentPink, fontSize: 18 },
   title: { fontSize: 20, fontWeight: "800", color: Colors.textPrimary },
   subtitle: { fontSize: 14, color: Colors.textSecondary },
   typeList: { gap: 8 },
@@ -520,20 +518,6 @@ const s = StyleSheet.create({
     paddingVertical: 15,
   },
   actionBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
-  actionBtnDark: {
-    backgroundColor: Colors.bgCard,
-    borderWidth: 1,
-    borderColor: Colors.inputBorder,
-    alignItems: "center",
-    paddingVertical: 15,
-    borderRadius: 50,
-  },
-  actionBtnTextDark: {
-    color: Colors.textPrimary,
-    fontSize: 15,
-    fontWeight: "600",
-  },
-
   // Recent photos section
   recentSection: { paddingHorizontal: 20, gap: 14 },
   recentHeader: {

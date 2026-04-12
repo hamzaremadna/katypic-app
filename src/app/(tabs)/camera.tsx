@@ -482,8 +482,8 @@ export default function CameraScreen() {
           params: { photoUri: photo.uri },
         });
       }
-    } catch (error) {
-      console.warn("Erreur de capture:", error);
+    } catch {
+      // capture failed — setIsCapturing reset in finally
     } finally {
       setIsCapturing(false);
     }

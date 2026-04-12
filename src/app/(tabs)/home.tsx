@@ -17,7 +17,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { Colors, Gradients } from "../../theme/colors";
 import { Fonts } from "../../theme/typography";
-import { KaytiHeader, BottomTabBar, UserBadge } from "../../components/ui";
+import { KaytiHeader, BottomTabBar } from "../../components/ui";
 import { Icon, IconName } from "../../components/ui/Icon";
 import { useRouter } from "expo-router";
 import { navigate } from "@/utils/navigation";
@@ -37,7 +37,7 @@ const CARD_IMAGES = {
   // assistant: require("../../assets/images/card-assistant.jpg"),
 };
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 
 // Menu card with photo background
 interface MenuCardProps {
@@ -815,7 +815,6 @@ const pl = StyleSheet.create({
   planSub: { fontFamily: Fonts.regular, fontSize: 10, color: Colors.textMuted },
   textWhite: { color: "#fff" },
   textWhite70: { color: "rgba(255,255,255,0.7)" },
-  textWhite85: { color: "rgba(255,255,255,0.85)" },
 });
 
 // Header button styles (settings left / bell right)
