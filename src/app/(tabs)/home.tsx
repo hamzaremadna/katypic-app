@@ -485,7 +485,7 @@ export default function HomeScreen() {
         route: "/(tabs)/quests",
       },
       {
-        title: "Découvrir\nles spots",
+        title: "Découvrir\nles événements",
         image: CARD_IMAGES.spots,
         route: "/(tabs)/discover",
       },

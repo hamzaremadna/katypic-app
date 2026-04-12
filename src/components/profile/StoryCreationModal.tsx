@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,8 +12,11 @@ import {
   ActivityIndicator,
   Alert,
   PanResponder,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Location from "expo-location";
 import { Colors, Gradients } from "@theme/colors";
 import { Fonts } from "@theme/typography";
 import { Icon } from "@components/ui/Icon";
@@ -31,21 +34,160 @@ interface Props {
   onClose: () => void;
 }
 
+// ─── Location Picker Modal ───────────────────────────────────────────────────
+interface LocationResult { label: string; sublabel?: string; }
+
+function LocationPicker({ visible, onSelect, onClose }: {
+  visible: boolean;
+  onSelect: (loc: string) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<LocationResult[]>([]);
+  const [gpsResult, setGpsResult] = useState<LocationResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auto-detect GPS on open
+  useEffect(() => {
+    if (!visible) return;
+    setQuery("");
+    setResults([]);
+    setGpsResult(null);
+    (async () => {
+      setGpsLoading(true);
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") return;
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        const [place] = await Location.reverseGeocodeAsync({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+        if (place) {
+          const label = [place.city ?? place.district ?? place.subregion, place.country].filter(Boolean).join(", ");
+          const sublabel = [place.street, place.postalCode].filter(Boolean).join(" ");
+          setGpsResult({ label, sublabel });
+        }
+      } catch { /* silent */ } finally {
+        setGpsLoading(false);
+      }
+    })();
+  }, [visible]);
+
+  // Search as user types
+  useEffect(() => {
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    if (!query.trim()) { setResults([]); return; }
+    searchTimeout.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const geo = await Location.geocodeAsync(query);
+        const unique = new Map<string, LocationResult>();
+        for (const g of geo.slice(0, 8)) {
+          const [place] = await Location.reverseGeocodeAsync({ latitude: g.latitude, longitude: g.longitude });
+          if (place) {
+            const label = [place.city ?? place.district ?? place.subregion, place.country].filter(Boolean).join(", ");
+            if (label && !unique.has(label)) unique.set(label, { label, sublabel: place.street ?? undefined });
+          }
+        }
+        setResults(Array.from(unique.values()));
+      } catch { setResults([]); } finally { setLoading(false); }
+    }, 500);
+  }, [query]);
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={lp.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <View style={lp.inner}>
+          {/* Header */}
+          <View style={lp.header}>
+            <TouchableOpacity onPress={onClose} style={lp.closeBtn}>
+              <Icon name="x" size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
+            <Text style={lp.title}>Ajouter un lieu</Text>
+            <View style={{ width: 36 }} />
+          </View>
+
+          {/* Search bar */}
+          <View style={lp.searchBar}>
+            <Icon name="search" size={16} color={Colors.textMuted} />
+            <TextInput
+              style={lp.searchInput}
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Rechercher un lieu…"
+              placeholderTextColor={Colors.textMuted}
+              autoFocus
+              returnKeyType="search"
+            />
+            {loading && <ActivityIndicator size="small" color={Colors.accentPurple} />}
+          </View>
+
+          {/* GPS suggestion */}
+          {!query.trim() && (
+            <TouchableOpacity
+              style={lp.row}
+              onPress={() => { if (gpsResult) { hapticLight(); onSelect(gpsResult.label); } }}
+              disabled={gpsLoading || !gpsResult}
+            >
+              <View style={lp.iconWrap}>
+                {gpsLoading ? <ActivityIndicator size="small" color={Colors.accentPurple} /> : <Icon name="marker-pin" size={18} color={Colors.accentPurple} />}
+              </View>
+              <View style={lp.rowText}>
+                <Text style={lp.rowLabel}>{gpsResult ? gpsResult.label : "Utiliser ma position"}</Text>
+                {gpsResult?.sublabel ? <Text style={lp.rowSub}>{gpsResult.sublabel}</Text> : null}
+              </View>
+            </TouchableOpacity>
+          )}
+
+          {/* Search results */}
+          <FlatList
+            data={results}
+            keyExtractor={(r) => r.label}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <TouchableOpacity style={lp.row} onPress={() => { hapticLight(); onSelect(item.label); }}>
+                <View style={lp.iconWrap}>
+                  <Icon name="marker-pin" size={18} color={Colors.textSecondary} />
+                </View>
+                <View style={lp.rowText}>
+                  <Text style={lp.rowLabel}>{item.label}</Text>
+                  {item.sublabel ? <Text style={lp.rowSub}>{item.sublabel}</Text> : null}
+                </View>
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={query.trim() && !loading ? (
+              <Text style={lp.noResults}>Aucun résultat</Text>
+            ) : null}
+          />
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+// ─── Main Modal ──────────────────────────────────────────────────────────────
+const DEFAULT_TEXT_POS = { x: 40, y: PREVIEW_HEIGHT / 2 - 20 };
+const DEFAULT_LOC_POS  = { x: 40, y: PREVIEW_HEIGHT / 2 + 40 };
+
 export function StoryCreationModal({ visible, onClose }: Props) {
   const [title, setTitle] = useState("");
+  const [location, setLocation] = useState("");
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [storyText, setStoryText] = useState("");
-  // Text position relative to the preview container
-  const textPosRef = useRef({ x: width / 2 - 80, y: PREVIEW_HEIGHT / 2 - 20 });
-  const [textPos, setTextPos] = useState({ x: width / 2 - 80, y: PREVIEW_HEIGHT / 2 - 20 });
   const [editingText, setEditingText] = useState(false);
+
+  // Sticker positions (ref = live drag, state = committed for render)
+  const textPosRef = useRef({ ...DEFAULT_TEXT_POS });
+  const [textPos, setTextPos] = useState({ ...DEFAULT_TEXT_POS });
+  const locPosRef  = useRef({ ...DEFAULT_LOC_POS });
+  const [locPos, setLocPos]   = useState({ ...DEFAULT_LOC_POS });
 
   const { data: photosData, isLoading: photosLoading } = usePhotos();
   const photos: Photo[] = photosData?.photos ?? [];
-
   const createStory = useCreateStory();
 
-  // PanResponder for dragging the story text overlay
+  // PanResponder for text sticker
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -61,6 +203,28 @@ export function StoryCreationModal({ visible, onClose }: Props) {
       },
     })
   ).current;
+
+  // PanResponder for location sticker
+  const locPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, gs) => {
+        locPosRef.current = {
+          x: locPosRef.current.x + gs.dx,
+          y: locPosRef.current.y + gs.dy,
+        };
+      },
+      onPanResponderRelease: () => {
+        setLocPos({ ...locPosRef.current });
+      },
+    })
+  ).current;
+
+  const openLocationPicker = useCallback(() => {
+    hapticLight();
+    setShowLocationPicker(true);
+  }, []);
 
   const togglePhoto = useCallback((id: string) => {
     hapticLight();
@@ -88,14 +252,17 @@ export function StoryCreationModal({ visible, onClose }: Props) {
     try {
       await createStory.mutateAsync({
         title: title.trim(),
+        location: location.trim() || undefined,
         photoIds: [...selectedIds],
       });
       setTitle("");
+      setLocation("");
       setSelectedIds(new Set());
       setStoryText("");
-      const resetPos = { x: width / 2 - 80, y: PREVIEW_HEIGHT / 2 - 20 };
-      textPosRef.current = resetPos;
-      setTextPos(resetPos);
+      textPosRef.current = { ...DEFAULT_TEXT_POS };
+      setTextPos({ ...DEFAULT_TEXT_POS });
+      locPosRef.current = { ...DEFAULT_LOC_POS };
+      setLocPos({ ...DEFAULT_LOC_POS });
       onClose();
     } catch {
       Alert.alert("Erreur", "Impossible de créer la sélection.");
@@ -105,11 +272,14 @@ export function StoryCreationModal({ visible, onClose }: Props) {
   const handleClose = () => {
     hapticLight();
     setTitle("");
+    setLocation("");
+    setShowLocationPicker(false);
     setSelectedIds(new Set());
     setStoryText("");
-    const resetPos = { x: width / 2 - 80, y: PREVIEW_HEIGHT / 2 - 20 };
-    textPosRef.current = resetPos;
-    setTextPos(resetPos);
+    textPosRef.current = { ...DEFAULT_TEXT_POS };
+    setTextPos({ ...DEFAULT_TEXT_POS });
+    locPosRef.current = { ...DEFAULT_LOC_POS };
+    setLocPos({ ...DEFAULT_LOC_POS });
     onClose();
   };
 
@@ -181,43 +351,58 @@ export function StoryCreationModal({ visible, onClose }: Props) {
           <Text style={s.charCount}>{title.length}/30</Text>
         </View>
 
-        {/* Story text preview (shows when photos selected) */}
+        {/* Story preview with stickers (shows when photo selected) */}
         {firstSelectedPhoto && (
           <View style={s.previewSection}>
-            <Text style={s.inputLabel}>TEXTE SUR LA STORY</Text>
+            {/* Sticker toolbar */}
+            <View style={s.stickerBar}>
+              <TouchableOpacity
+                style={[s.stickerBtn, storyText.trim() && s.stickerBtnActive]}
+                onPress={() => { hapticLight(); setEditingText(true); }}
+              >
+                <Text style={s.stickerBtnLabel}>Aa</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.stickerBtn, location.trim() && s.stickerBtnActive]}
+                onPress={openLocationPicker}
+              >
+                <Icon name="marker-pin" size={16} color={location.trim() ? Colors.accentPurple : Colors.textSecondary} />
+                <Text style={[s.stickerBtnLabel, location.trim() && { color: Colors.accentPurple }]}>Lieu</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Image canvas */}
             <View style={s.previewWrap}>
               <Image
                 source={{ uri: firstSelectedPhoto.thumbnailUrl ?? firstSelectedPhoto.url }}
                 style={s.previewImage}
                 resizeMode="cover"
               />
-              {/* Dark overlay for readability */}
               <View style={s.previewDim} />
 
-              {/* Draggable text overlay */}
+              {/* Draggable text sticker */}
               {storyText.trim().length > 0 && (
-                <View
-                  style={[s.textOverlay, { left: textPos.x, top: textPos.y }]}
-                  {...panResponder.panHandlers}
-                >
+                <View style={[s.textOverlay, { left: textPos.x, top: textPos.y }]} {...panResponder.panHandlers}>
                   <Text style={s.overlayText}>{storyText}</Text>
                 </View>
               )}
 
-              {/* Edit text button */}
-              <TouchableOpacity
-                style={s.editTextBtn}
-                onPress={() => { hapticLight(); setEditingText(true); }}
-                activeOpacity={0.8}
-              >
-                <Icon name="pen" size={14} color="#fff" />
-                <Text style={s.editTextBtnLabel}>
-                  {storyText.trim() ? "Modifier le texte" : "Ajouter un texte"}
-                </Text>
-              </TouchableOpacity>
+              {/* Draggable location sticker */}
+              {location.trim().length > 0 && (
+                <View style={[s.locationSticker, { left: locPos.x, top: locPos.y }]} {...locPanResponder.panHandlers}>
+                  <Icon name="marker-pin" size={12} color="#fff" />
+                  <Text style={s.locationStickerText} numberOfLines={1}>{location}</Text>
+                  <TouchableOpacity
+                    onPress={() => { hapticLight(); setLocation(""); }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Icon name="x" size={11} color="rgba(255,255,255,0.8)" />
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
-            {storyText.trim().length > 0 && (
-              <Text style={s.dragHint}>Faites glisser le texte pour le repositionner</Text>
+            {(storyText.trim() || location.trim()) && (
+              <Text style={s.dragHint}>Faites glisser les stickers pour les repositionner</Text>
             )}
           </View>
         )}
@@ -307,6 +492,12 @@ export function StoryCreationModal({ visible, onClose }: Props) {
           </TouchableOpacity>
         </View>
       </View>
+
+      <LocationPicker
+        visible={showLocationPicker}
+        onSelect={(loc) => { setLocation(loc); setShowLocationPicker(false); }}
+        onClose={() => setShowLocationPicker(false)}
+      />
     </Modal>
   );
 }
@@ -366,6 +557,49 @@ const s = StyleSheet.create({
     color: Colors.textMuted,
     textAlign: "right",
     marginTop: 6,
+  },
+  stickerBar: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  stickerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  stickerBtnActive: {
+    borderColor: Colors.accentPurple,
+    backgroundColor: "rgba(123,47,190,0.15)",
+  },
+  stickerBtnLabel: {
+    fontFamily: Fonts.semibold,
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  locationSticker: {
+    position: "absolute",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    maxWidth: 200,
+  },
+  locationStickerText: {
+    fontFamily: Fonts.semibold,
+    fontSize: 12,
+    color: "#fff",
+    flex: 1,
   },
 
   // Story text preview
@@ -546,5 +780,83 @@ const s = StyleSheet.create({
     fontFamily: Fonts.semibold,
     fontSize: 15,
     color: "#fff",
+  },
+});
+
+const lp = StyleSheet.create({
+  container: { flex: 1 },
+  inner: {
+    flex: 1,
+    backgroundColor: "#0E0A24",
+    paddingTop: 8,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.07)",
+  },
+  closeBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
+  title: {
+    fontFamily: Fonts.bold,
+    fontSize: 16,
+    color: Colors.textPrimary,
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    margin: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: Fonts.regular,
+    fontSize: 15,
+    color: Colors.textPrimary,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    gap: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.05)",
+  },
+  iconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "rgba(123,47,190,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rowText: { flex: 1 },
+  rowLabel: {
+    fontFamily: Fonts.semibold,
+    fontSize: 14,
+    color: Colors.textPrimary,
+  },
+  rowSub: {
+    fontFamily: Fonts.regular,
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  noResults: {
+    textAlign: "center",
+    fontFamily: Fonts.regular,
+    fontSize: 14,
+    color: Colors.textMuted,
+    marginTop: 32,
   },
 });

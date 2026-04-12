@@ -126,7 +126,7 @@ const INITIAL_REGION = {
 
 export default function DiscoverScreen() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabType>("spots");
+  const [activeTab, setActiveTab] = useState<TabType>("events");
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const mapRef = useRef<MapView>(null);
   const [mapType, setMapType] = useState<"standard" | "satellite">("standard");
@@ -140,7 +140,12 @@ export default function DiscoverScreen() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status === "granted") {
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        setUserLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+        const { latitude, longitude } = loc.coords;
+        setUserLocation({ lat: latitude, lng: longitude });
+        mapRef.current?.animateToRegion(
+          { latitude, longitude, latitudeDelta: 0.06, longitudeDelta: 0.06 },
+          800,
+        );
       }
     })();
   }, []);
@@ -299,29 +304,6 @@ export default function DiscoverScreen() {
         <TouchableOpacity
           style={styles.tabButton}
           activeOpacity={0.8}
-          onPress={() => handleTabChange("spots")}
-        >
-          {activeTab === "spots" ? (
-            <LinearGradient
-              colors={Gradients.purpleBlue}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.tabGradient}
-            >
-              <Icon name="marker-pin" size={16} color="#FFFFFF" />
-              <Text style={styles.tabTextActive}>Spots photo</Text>
-            </LinearGradient>
-          ) : (
-            <View style={styles.tabInactive}>
-              <Icon name="marker-pin" size={16} color={Colors.textSecondary} />
-              <Text style={styles.tabTextInactive}>Spots photo</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.tabButton}
-          activeOpacity={0.8}
           onPress={() => handleTabChange("events")}
         >
           {activeTab === "events" ? (
@@ -338,6 +320,29 @@ export default function DiscoverScreen() {
             <View style={styles.tabInactive}>
               <Icon name="calendar" size={16} color={Colors.textSecondary} />
               <Text style={styles.tabTextInactive}>Événements</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.tabButton}
+          activeOpacity={0.8}
+          onPress={() => handleTabChange("spots")}
+        >
+          {activeTab === "spots" ? (
+            <LinearGradient
+              colors={Gradients.purpleBlue}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.tabGradient}
+            >
+              <Icon name="marker-pin" size={16} color="#FFFFFF" />
+              <Text style={styles.tabTextActive}>Spots photo</Text>
+            </LinearGradient>
+          ) : (
+            <View style={styles.tabInactive}>
+              <Icon name="marker-pin" size={16} color={Colors.textSecondary} />
+              <Text style={styles.tabTextInactive}>Spots photo</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -530,7 +535,7 @@ export default function DiscoverScreen() {
 
       <TourOverlay
         steps={TOUR_DISCOVER}
-        tourTitle="Découvrir les spots"
+        tourTitle="Découvrir les événements"
         visible={showTour}
         onFinish={handleTourFinish}
       />

@@ -19,7 +19,7 @@ export function useUserStories(userId: string | undefined) {
 export function useCreateStory() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { title: string; photoIds: string[] }) =>
+    mutationFn: (data: { title: string; location?: string; photoIds: string[] }) =>
       storyApi.createStory(data).then((r) => r.data as Story),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stories', 'me'] });

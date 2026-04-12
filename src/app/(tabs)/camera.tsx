@@ -9,12 +9,18 @@ import {
   Animated,
   ActivityIndicator,
   Linking,
+  Modal,
+  TextInput,
+  Image,
+  KeyboardAvoidingView,
 } from "react-native";
 import { Accelerometer } from "expo-sensors";
 import { LinearGradient } from "expo-linear-gradient";
 import { CameraView, useCameraPermissions, CameraType } from "expo-camera";
 import { StatusBar } from "expo-status-bar";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { useUploadPhoto } from "../../hooks/useUploadPhoto";
+import { useUpdatePhoto } from "../../hooks/usePhotos";
 import { Colors, Gradients } from "../../theme/colors";
 import { BottomTabBar } from "../../components/ui";
 import { Icon } from "../../components/ui/Icon";
@@ -307,6 +313,13 @@ const lv = StyleSheet.create({
 // ─────────────────────────────────────────────
 export default function CameraScreen() {
   const router = useRouter();
+  const { source } = useLocalSearchParams<{ source?: string }>();
+  const isProfileMode = source === "profile";
+  const uploadPhoto = useUploadPhoto();
+  const updatePhoto = useUpdatePhoto();
+  const [captionUri, setCaptionUri] = useState<string | null>(null);
+  const [caption, setCaption] = useState("");
+  const [isPublishing, setIsPublishing] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<CameraType>("back");
   const [flashEnabled, setFlashEnabled] = useState(false);
@@ -399,24 +412,28 @@ export default function CameraScreen() {
     ]).start();
 
     try {
-      // saveToPhotos: false prevents saving to device camera roll
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.9,
         skipProcessing: false,
       });
-      if (photo) {
-        // Navigate to analysis result
+      if (!photo) return;
+
+      if (isProfileMode) {
+        // Show caption modal before publishing
+        setCaptionUri(photo.uri);
+        setCaption("");
+      } else {
         router.push({
           pathname: "/analyse/result",
           params: { photoUri: photo.uri },
         });
       }
     } catch {
-      // capture failed — setIsCapturing reset in finally
+      // capture failed
     } finally {
       setIsCapturing(false);
     }
-  }, [isCapturing, router]);
+  }, [isCapturing, isProfileMode, uploadPhoto, updatePhoto, router]);
 
   const toggleFlash = useCallback(() => {
     hapticLight();
@@ -432,6 +449,22 @@ export default function CameraScreen() {
     hapticLight();
     setShowGrid((prev) => !prev);
   }, []);
+
+  const handlePublish = useCallback(async () => {
+    if (!captionUri) return;
+    setIsPublishing(true);
+    try {
+      const saved = await uploadPhoto.mutateAsync({ photoUri: captionUri, caption: caption.trim() || undefined });
+      await updatePhoto.mutateAsync({ photoId: saved.id, data: { isPublic: true } });
+      setCaptionUri(null);
+      setCaption("");
+      router.replace("/(tabs)/profile" as never);
+    } catch {
+      // keep modal open on error
+    } finally {
+      setIsPublishing(false);
+    }
+  }, [captionUri, caption, uploadPhoto, updatePhoto, router]);
 
   // ─── Permission not yet determined ───
   if (!permission) {
@@ -667,6 +700,60 @@ export default function CameraScreen() {
         onClose={() => setShowModeModal(false)}
         onConfirm={startAssistant}
       />
+
+      {/* ── Profile Photo Caption Modal ── */}
+      <Modal visible={!!captionUri} animationType="slide" presentationStyle="pageSheet">
+        <KeyboardAvoidingView style={cap.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <LinearGradient colors={["#0E0A24", "#080814"]} style={StyleSheet.absoluteFillObject} />
+
+          {/* Header */}
+          <View style={cap.header}>
+            <TouchableOpacity onPress={() => { setCaptionUri(null); setCaption(""); }} style={cap.closeBtn}>
+              <Icon name="x" size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
+            <Text style={cap.headerTitle}>Nouvelle photo</Text>
+            <View style={{ width: 36 }} />
+          </View>
+
+          {/* Preview */}
+          {captionUri && (
+            <Image source={{ uri: captionUri }} style={cap.preview} resizeMode="cover" />
+          )}
+
+          {/* Caption input */}
+          <View style={cap.inputWrap}>
+            <TextInput
+              style={cap.input}
+              value={caption}
+              onChangeText={setCaption}
+              placeholder="Écrire une description…"
+              placeholderTextColor={Colors.textMuted}
+              multiline
+              maxLength={300}
+            />
+            <Text style={cap.charCount}>{caption.length}/300</Text>
+          </View>
+
+          {/* Publish button */}
+          <TouchableOpacity
+            style={cap.publishBtn}
+            onPress={handlePublish}
+            disabled={isPublishing}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={Gradients.brand as [string, string]}
+              style={cap.publishGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              {isPublishing
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Text style={cap.publishText}>Publier sur mon profil</Text>}
+            </LinearGradient>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -822,4 +909,37 @@ const s = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
   },
+});
+
+const cap = StyleSheet.create({
+  container: { flex: 1 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 12,
+  },
+  closeBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
+  headerTitle: { fontFamily: "System", fontWeight: "700", fontSize: 16, color: "#fff" },
+  preview: {
+    width: width,
+    height: width * 1.1,
+  },
+  inputWrap: { paddingHorizontal: 20, paddingTop: 16 },
+  input: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 12,
+    padding: 14,
+    color: "#fff",
+    fontSize: 15,
+    minHeight: 80,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  charCount: { color: Colors.textMuted, fontSize: 11, textAlign: "right", marginTop: 4 },
+  publishBtn: { margin: 20, borderRadius: 14, overflow: "hidden" },
+  publishGradient: { paddingVertical: 16, alignItems: "center" },
+  publishText: { color: "#fff", fontWeight: "700", fontSize: 16 },
 });

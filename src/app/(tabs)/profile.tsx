@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
+import { useFocusEffect } from "expo-router";
 import {
   View,
   Text,
@@ -157,10 +158,12 @@ export default function ProfileScreen() {
 
   // ── Real photos ──
   const { data: photosData, isLoading: photosLoading, refetch: refetchPhotos } = usePhotos();
-  const allPhotos: Photo[] = photosData?.photos ?? [];
-  // Profile only shows photos the user has explicitly made public
-  const userPhotos: Photo[] = allPhotos.filter((p) => p.isPublic);
+  // Profile only shows photos explicitly added by the user (isPublic = true)
+  const userPhotos: Photo[] = (photosData?.photos ?? []).filter((p) => p.isPublic);
   const photoCount = userPhotos.length;
+
+  // Refetch when screen regains focus (e.g. after taking a photo)
+  useFocusEffect(useCallback(() => { refetchPhotos(); }, [refetchPhotos]));
 
   const displayName = profile?.displayName ?? authUser?.username ?? "Photographe";
   const bio = profile?.bio ?? "Passionné de photographie.";
@@ -183,8 +186,8 @@ export default function ProfileScreen() {
   );
 
   const analysesCount = useMemo(
-    () => allPhotos.filter((p) => (p.analyses?.length ?? 0) > 0).length,
-    [allPhotos],
+    () => userPhotos.filter((p) => (p.analyses?.length ?? 0) > 0).length,
+    [userPhotos],
   );
 
   const handleGoToEditProfile = useCallback(() => {
@@ -405,31 +408,40 @@ export default function ProfileScreen() {
                   Aucune photo pour l&apos;instant
                 </Text>
                 <TouchableOpacity
-                  onPress={() => router.push("/(tabs)/camera" as never)}
+                  onPress={() => router.push({ pathname: "/(tabs)/camera", params: { source: "profile" } } as never)}
                 >
                   <Text style={s.emptyPhotosLink}>Prendre une photo</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              userPhotos.map((photo) => (
+              <>
+                {/* Always-visible Add button */}
                 <TouchableOpacity
-                  key={photo.id}
-                  style={s.photoItem}
-                  onPress={() => {
-                    hapticLight();
-                    router.push({
-                      pathname: "/gallery/[photoId]",
-                      params: { photoId: photo.id, photoUri: photo.url },
-                    });
-                  }}
+                  style={[s.photoItem, s.photoAddItem]}
+                  onPress={() => { hapticLight(); router.push({ pathname: "/(tabs)/camera", params: { source: "profile" } } as never); }}
                 >
-                  <Image
-                    source={{ uri: photo.url }}
-                    style={StyleSheet.absoluteFillObject}
-                    resizeMode="cover"
-                  />
+                  <Icon name="plus" size={28} color={Colors.textMuted} />
                 </TouchableOpacity>
-              ))
+                {userPhotos.map((photo) => (
+                  <TouchableOpacity
+                    key={photo.id}
+                    style={s.photoItem}
+                    onPress={() => {
+                      hapticLight();
+                      router.push({
+                        pathname: "/gallery/[photoId]",
+                        params: { photoId: photo.id, photoUri: photo.url },
+                      });
+                    }}
+                  >
+                    <Image
+                      source={{ uri: photo.url }}
+                      style={StyleSheet.absoluteFillObject}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                ))}
+              </>
             )}
           </View>
         ) : (
@@ -691,6 +703,13 @@ const s = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
     backgroundColor: Colors.bgCard,
+  },
+  photoAddItem: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.12)",
+    borderStyle: "dashed",
   },
   photosLoading: {
     width: "100%",
