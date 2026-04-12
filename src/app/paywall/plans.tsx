@@ -129,10 +129,11 @@ function PlanCard({
   const price = isYearly ? plan.yearlyMonthlyPrice : plan.monthlyPrice;
   const showSaving = isYearly && plan.monthlyPrice > 0;
   const h = plan.highlighted;
+  const isPro = plan.id === "pro";
 
   return (
-    <View style={[s.planCard, h && s.planCardHighlighted]}>
-      {/* Gradient bg for premium */}
+    <View style={[s.planCard, h && s.planCardHighlighted, isPro && s.planCardPro]}>
+      {/* Premium: colourful gradient */}
       {h && (
         <LinearGradient
           colors={Gradients.paywall}
@@ -141,30 +142,46 @@ function PlanCard({
           end={PW_END}
         />
       )}
+      {/* Pro: dark prestige gradient */}
+      {isPro && (
+        <LinearGradient
+          colors={["#1C1030", "#0D0618", "#140820"]}
+          style={[StyleSheet.absoluteFillObject, { borderRadius: 20 }]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
+      )}
+
+      {/* ÉLITE badge for Pro */}
+      {isPro && (
+        <View style={s.eliteBadge}>
+          <Text style={s.eliteBadgeText}>👑 ÉLITE</Text>
+        </View>
+      )}
 
       {/* Header row: icon + name */}
       <View style={s.planHeader}>
-        <View style={[s.planIconWrap, h && s.planIconWrapHighlighted]}>
+        <View style={[s.planIconWrap, (h || isPro) && s.planIconWrapHighlighted, isPro && s.planIconWrapPro]}>
           <Icon
             name={plan.icon}
             size={20}
-            color={h ? "#F6339A" : Colors.textSecondary}
+            color={h ? "#F6339A" : isPro ? "#FFD700" : Colors.textSecondary}
           />
         </View>
         <View style={{ flex: 1 }} />
-        <Text style={[s.planName, h && s.textWhite]}>{plan.name}</Text>
+        {!isPro && <Text style={[s.planName, h && s.textWhite]}>{plan.name}</Text>}
       </View>
 
       {/* Price */}
       <View style={s.priceRow}>
-        <Text style={[s.priceAmount, h && s.textWhite]}>
+        <Text style={[s.priceAmount, (h || isPro) && s.textWhite]}>
           {price.toFixed(2).replace(".", ",")}€
         </Text>
-        <Text style={[s.pricePeriod, h && s.textWhite70]}>/mois</Text>
+        <Text style={[s.pricePeriod, (h || isPro) && s.textWhite70]}>/mois</Text>
       </View>
 
       {showSaving && (
-        <Text style={[s.savingText, h && { color: "#FFD700" }]}>
+        <Text style={[s.savingText, h && { color: "#FFD700" }, isPro && { color: "#FFD700" }]}>
           Économisez 17%
         </Text>
       )}
@@ -176,9 +193,9 @@ function PlanCard({
             <Icon
               name="check"
               size={14}
-              color={h ? "#fff" : Colors.accentGreen}
+              color={isPro ? "#FFD700" : h ? "#fff" : Colors.accentGreen}
             />
-            <Text style={[s.featureText, h && s.textWhite85]}>{f}</Text>
+            <Text style={[s.featureText, (h || isPro) && s.textWhite85]}>{f}</Text>
           </View>
         ))}
       </View>
@@ -197,8 +214,12 @@ function PlanCard({
               style={s.planBtnTextGrad}
             />
           </View>
+        ) : isPro ? (
+          /* Pro: gold-bordered dark button */
+          <View style={s.planBtnGold}>
+            <Text style={s.planBtnTextGold}>Choisir {plan.name}</Text>
+          </View>
         ) : (
-          /* Pro: dark outlined button */
           <View style={s.planBtnOutline}>
             <Text style={s.planBtnTextOutline}>Choisir {plan.name}</Text>
           </View>
@@ -505,6 +526,28 @@ const s = StyleSheet.create({
   planCardHighlighted: {
     borderWidth: 0,
   },
+  planCardPro: {
+    borderColor: "rgba(255,215,0,0.35)",
+    borderWidth: 1.5,
+  },
+  eliteBadge: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    backgroundColor: "rgba(255,215,0,0.15)",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "rgba(255,215,0,0.4)",
+    zIndex: 1,
+  },
+  eliteBadgeText: {
+    fontFamily: Fonts.bold,
+    fontSize: 11,
+    color: "#FFD700",
+    letterSpacing: 0.5,
+  },
 
   // Plan header
   planHeader: {
@@ -521,6 +564,9 @@ const s = StyleSheet.create({
   },
   planIconWrapHighlighted: {
     backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  planIconWrapPro: {
+    backgroundColor: "rgba(255,215,0,0.15)",
   },
   planName: {
     fontFamily: Fonts.bold,
@@ -597,5 +643,19 @@ const s = StyleSheet.create({
     fontFamily: Fonts.bold,
     fontSize: 15,
     color: Colors.textMuted,
+  },
+  planBtnGold: {
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,215,0,0.6)",
+    backgroundColor: "rgba(255,215,0,0.08)",
+  },
+  planBtnTextGold: {
+    fontFamily: Fonts.bold,
+    fontSize: 15,
+    color: "#FFD700",
   },
 });

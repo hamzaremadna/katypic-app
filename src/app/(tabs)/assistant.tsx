@@ -20,7 +20,6 @@ import { useChatWithCoach, useChatSession } from "@hooks/useChatWithCoach";
 import type { ChatMessage } from "@services/api/ai.api";
 import { ChatBubbleList } from "@components/assistant/ChatBubble";
 import { SuggestionChips } from "@components/assistant/SuggestionChips";
-import { VoiceRecordingModal } from "@components/assistant/VoiceInput";
 import { hapticLight, hapticMedium } from "../../utils/haptics";
 
 // Message sent when user taps the sparkles button to request a suggestion
@@ -29,7 +28,6 @@ const SUGGEST_PROMPT = "Suggère-moi un exercice photo à pratiquer aujourd'hui.
 export default function AssistantScreen() {
   const [sessionId, setSessionId] = useState<string>("");
   const [inputText, setInputText] = useState("");
-  const [showVoice, setShowVoice] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState<number | null>(null);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -161,9 +159,6 @@ export default function AssistantScreen() {
     );
   }, [initSession, clearError]);
 
-  const handleOpenVoice = useCallback(() => { hapticLight(); setShowVoice(true); }, []);
-  const handleCloseVoice = useCallback(() => setShowVoice(false), []);
-
   const handleContentSizeChange = useCallback(() => {
     if (hasMessages) {
       scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -291,13 +286,6 @@ export default function AssistantScreen() {
                 </View>
               </TouchableOpacity>
 
-              {/* Mic → voice input */}
-              <TouchableOpacity style={s.inputIconBtn} onPress={handleOpenVoice}>
-                <View style={s.inputIconCircle}>
-                  <Icon name="mic" size={16} color="#fff" />
-                </View>
-              </TouchableOpacity>
-
               {/* Send */}
               <TouchableOpacity
                 style={s.inputIconBtn}
@@ -324,11 +312,6 @@ export default function AssistantScreen() {
 
       {!keyboardVisible && <BottomTabBar activeRoute="/(tabs)/assistant" />}
 
-      <VoiceRecordingModal
-        visible={showVoice}
-        onClose={handleCloseVoice}
-        onTranscript={handleSend}
-      />
     </View>
   );
 }

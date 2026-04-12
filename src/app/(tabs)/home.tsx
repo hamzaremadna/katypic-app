@@ -18,7 +18,7 @@ import { StatusBar } from "expo-status-bar";
 import { Colors, Gradients } from "../../theme/colors";
 import { Fonts } from "../../theme/typography";
 import { KaytiHeader, BottomTabBar, UserBadge } from "../../components/ui";
-import { Icon } from "../../components/ui/Icon";
+import { Icon, IconName } from "../../components/ui/Icon";
 import { useRouter } from "expo-router";
 import { navigate } from "@/utils/navigation";
 import { useAuthStore } from "../../stores/authStore";
@@ -34,7 +34,7 @@ const CARD_IMAGES = {
   analyze: require("../../assets/images/card-analyze.jpg"),
   quests: require("../../assets/images/card-quests.jpg"),
   spots: require("../../assets/images/card-spots.jpg"),
-  assistant: require("../../assets/images/card-assistant.jpg"),
+  // assistant: require("../../assets/images/card-assistant.jpg"),
 };
 
 const { width, height } = Dimensions.get("window");
@@ -132,6 +132,104 @@ const mc = StyleSheet.create({
     textShadowRadius: 4,
   },
 });
+
+// ─── Plans section ────────────────────────────────────────────────────────────
+
+const HOME_PLANS: {
+  id: string;
+  name: string;
+  icon: IconName;
+  price: string;
+  sub: string;
+  features: string[];
+  highlighted: boolean;
+  isPro: boolean;
+}[] = [
+  {
+    id: "premium",
+    name: "Premium",
+    icon: "sparkles",
+    price: "8,33€",
+    sub: "/mois",
+    features: ["Analyses illimitées", "Coach IA", "Économisez 17%"],
+    highlighted: true,
+    isPro: false,
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    icon: "award",
+    price: "20,83€",
+    sub: "/mois",
+    features: ["Tout Premium inclus", "Coaching 1-to-1"],
+    highlighted: false,
+    isPro: true,
+  },
+];
+
+function PlansSection() {
+  return (
+    <View style={pl.wrapper}>
+      <View style={pl.header}>
+        <Icon name="sparkles" size={13} color={Colors.accentPink} />
+        <Text style={pl.headerTitle}>Passez au niveau supérieur</Text>
+        <TouchableOpacity onPress={() => { hapticLight(); navigate("/paywall/plans"); }}>
+          <Text style={pl.headerLink}>Voir tout →</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={pl.row}>
+        {HOME_PLANS.map((plan) => (
+          <TouchableOpacity
+            key={plan.id}
+            style={[pl.card, plan.highlighted && pl.cardHL, plan.isPro && pl.cardPro]}
+            onPress={() => { hapticLight(); navigate("/paywall/plans"); }}
+            activeOpacity={0.85}
+          >
+            {/* Premium: colourful paywall gradient */}
+            {plan.highlighted && (
+              <LinearGradient
+                colors={Gradients.paywall}
+                style={StyleSheet.absoluteFillObject}
+                start={{ x: 0.2, y: 0 }}
+                end={{ x: 0.8, y: 1 }}
+              />
+            )}
+            {/* Pro: dark prestige gradient */}
+            {plan.isPro && (
+              <LinearGradient
+                colors={["#1C1030", "#0D0618", "#140820"]}
+                style={StyleSheet.absoluteFillObject}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              />
+            )}
+            {plan.highlighted && (
+              <View style={pl.badge}>
+                <Text style={pl.badgeText}>⭐ POPULAIRE</Text>
+              </View>
+            )}
+            {plan.isPro && (
+              <View style={pl.badgePro}>
+                <Text style={pl.badgeProText}>👑 ÉLITE</Text>
+              </View>
+            )}
+            <View style={[pl.iconBubble, (plan.highlighted || plan.isPro) && pl.iconBubbleHL]}>
+              <Icon
+                name={plan.icon}
+                size={16}
+                color={plan.highlighted ? "#F6339A" : "#FFD700"}
+              />
+            </View>
+            <Text style={[pl.planName, pl.textWhite]}>{plan.name}</Text>
+            <Text style={[pl.planPrice, pl.textWhite]}>
+              {plan.price}<Text style={[pl.planSub, pl.textWhite70]}> {plan.sub}</Text>
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
 
 // Category labels for display
 const CATEGORY_LABELS: Record<string, string> = {
@@ -396,11 +494,11 @@ export default function HomeScreen() {
         image: CARD_IMAGES.spots,
         route: "/(tabs)/discover",
       },
-      {
-        title: "Assistant\nConseil IA",
-        image: CARD_IMAGES.assistant,
-        route: "/(tabs)/assistant",
-      },
+      // {
+      //   title: "Assistant\nConseil IA",
+      //   image: CARD_IMAGES.assistant,
+      //   route: "/(tabs)/assistant",
+      // },
     ],
     [],
   );
@@ -495,25 +593,8 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Quick stats row */}
-        {totalPhotos > 0 && (
-          <View style={s.statsRow}>
-            <View style={s.statItem}>
-              <Text style={s.statValue}>{totalPhotos}</Text>
-              <Text style={s.statLabel}>Photos</Text>
-            </View>
-            <View style={s.statDivider} />
-            <View style={s.statItem}>
-              <Text style={s.statValue}>{analyzedPhotos}</Text>
-              <Text style={s.statLabel}>Analyses</Text>
-            </View>
-            <View style={s.statDivider} />
-            <View style={s.statItem}>
-              <Text style={s.statValue}>{questPercent}%</Text>
-              <Text style={s.statLabel}>Progression</Text>
-            </View>
-          </View>
-        )}
+        {/* Plans section */}
+        <PlansSection />
 
         {/* Menu cards */}
         <View style={s.menuCards}>
@@ -571,7 +652,7 @@ export default function HomeScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bgDeep },
-  scroll: { paddingBottom: 20, gap: 20 },
+  scroll: { paddingBottom: 20, gap: 12 },
 
   profileHeader: {
     flexDirection: "row",
@@ -579,6 +660,7 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 35,
     paddingBottom: 8,
+    marginTop: -8,
   },
   galleryShortcut: { alignItems: "center", gap: 6, width: 70 },
   conseilShortcut: { alignItems: "center", gap: 6, width: 70 },
@@ -624,34 +706,6 @@ const s = StyleSheet.create({
     color: Colors.textPrimary,
   },
   greetingName: { fontFamily: Fonts.bold, color: Colors.textPrimary },
-
-  statsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 30,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderRadius: 16,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-  },
-  statItem: { flex: 1, alignItems: "center", gap: 2 },
-  statValue: {
-    fontFamily: Fonts.extrabold,
-    fontSize: 20,
-    color: Colors.textPrimary,
-  },
-  statLabel: {
-    fontFamily: Fonts.regular,
-    fontSize: 11,
-    color: Colors.textMuted,
-  },
-  statDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
 
   menuCards: { paddingHorizontal: 20, gap: 10 },
 
@@ -704,6 +758,64 @@ const s = StyleSheet.create({
 
   voirBtnText: { fontFamily: Fonts.bold, color: "#000", fontSize: 13 },
   bottomSpacer: { height: 100 },
+});
+
+// ─── Plans section styles ─────────────────────────────────────────────────────
+const pl = StyleSheet.create({
+  wrapper: { paddingHorizontal: 20 },
+  header: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 },
+  headerTitle: { flex: 1, fontFamily: Fonts.bold, fontSize: 13, color: Colors.textPrimary },
+  headerLink: { fontFamily: Fonts.semibold, fontSize: 12, color: Colors.textMuted },
+  row: { flexDirection: "row", gap: 10 },
+  card: {
+    flex: 1,
+    borderRadius: 14,
+    padding: 12,
+    gap: 4,
+    overflow: "hidden",
+    backgroundColor: Colors.bgCard,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  cardHL: { borderWidth: 0 },
+  cardPro: { borderColor: "rgba(255,215,0,0.35)", borderWidth: 1.5 },
+  badge: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "rgba(255,255,255,0.22)",
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  badgeText: { fontFamily: Fonts.bold, fontSize: 8, color: "#fff", letterSpacing: 0.3 },
+  badgePro: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "rgba(255,215,0,0.18)",
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: "rgba(255,215,0,0.4)",
+  },
+  badgeProText: { fontFamily: Fonts.bold, fontSize: 8, color: "#FFD700", letterSpacing: 0.3 },
+  iconBubble: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconBubbleHL: { backgroundColor: "rgba(255,255,255,0.2)" },
+  planName: { fontFamily: Fonts.bold, fontSize: 13, color: Colors.textPrimary },
+  planPrice: { fontFamily: Fonts.extrabold, fontSize: 17, color: Colors.textPrimary },
+  planSub: { fontFamily: Fonts.regular, fontSize: 10, color: Colors.textMuted },
+  textWhite: { color: "#fff" },
+  textWhite70: { color: "rgba(255,255,255,0.7)" },
+  textWhite85: { color: "rgba(255,255,255,0.85)" },
 });
 
 // Header button styles (settings left / bell right)
