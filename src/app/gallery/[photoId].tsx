@@ -12,6 +12,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
@@ -21,9 +22,11 @@ import { Fonts } from "../../theme/typography";
 import { KaytiHeader } from "../../components/ui";
 import { Icon } from "../../components/ui/Icon";
 import { useDeletePhoto, usePhoto } from "../../hooks/usePhotos";
+import { useAuthStore } from "../../stores/authStore";
 import { hapticLight, hapticMedium, hapticHeavy } from "../../utils/haptics";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
+const PHOTO_HEIGHT = width; // square like Instagram
 
 // ─── Share caption modal ──────────────────────────────────────────────────────
 
@@ -203,149 +206,135 @@ const sm = StyleSheet.create({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+}
+
 export default function GalleryPhotoViewScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{
-    photoId: string;
-    photoUri: string;
-  }>();
-
+  const params = useLocalSearchParams<{ photoId: string; photoUri: string }>();
   const photoUri = params.photoUri ?? "";
   const photoId = params.photoId ?? "";
 
   const deletePhoto = useDeletePhoto();
   const { data: photo } = usePhoto(photoId);
+  const user = useAuthStore((s) => s.user);
   const [showShareModal, setShowShareModal] = useState(false);
 
-  const handleImport = () => {
-    hapticMedium();
-    router.push({
-      pathname: "/analyse/import",
-      params: { photoUri },
-    });
-  };
+  const score = photo?.analyses?.[0]?.overallScore;
+  const username = user?.username ?? "moi";
+  const initial = username[0]?.toUpperCase() ?? "?";
 
   const handleEdit = () => {
     hapticLight();
-    router.push({
-      pathname: "/edit/[photoId]",
-      params: { photoId, photoUri },
-    });
+    router.push({ pathname: "/edit/[photoId]", params: { photoId, photoUri } });
   };
 
   const handleAnalyse = () => {
     hapticMedium();
-    router.push({
-      pathname: "/analyse/result",
-      params: { photoId, photoUri },
-    });
+    router.push({ pathname: "/analyse/result", params: { photoId, photoUri } });
   };
 
   const handleDelete = () => {
     hapticLight();
-    Alert.alert(
-      "Supprimer la photo",
-      "Cette action est irréversible.",
-      [
-        { text: "Annuler", style: "cancel" },
-        {
-          text: "Supprimer",
-          style: "destructive",
-          onPress: async () => {
-            hapticHeavy();
-            try {
-              await deletePhoto.mutateAsync(photoId);
-              router.back();
-            } catch {
-              Alert.alert("Erreur", "Impossible de supprimer la photo.");
-            }
-          },
+    Alert.alert("Supprimer la photo", "Cette action est irréversible.", [
+      { text: "Annuler", style: "cancel" },
+      {
+        text: "Supprimer",
+        style: "destructive",
+        onPress: async () => {
+          hapticHeavy();
+          try {
+            await deletePhoto.mutateAsync(photoId);
+            router.back();
+          } catch {
+            Alert.alert("Erreur", "Impossible de supprimer la photo.");
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   return (
     <View style={s.container}>
       <StatusBar style="light" />
-      <LinearGradient
-        colors={["#0E0A24", "#080814"]}
-        style={StyleSheet.absoluteFillObject}
-      />
+      <LinearGradient colors={["#0E0A24", "#080814"]} style={StyleSheet.absoluteFillObject} />
 
-      <KaytiHeader showBack title="Ma Galerie" />
+      <KaytiHeader showBack title="" />
 
-      {/* Full photo */}
-      <View style={s.photoWrap}>
-        {photoUri ? (
-          <Image
-            source={{ uri: photoUri }}
-            style={s.photo}
-            resizeMode="contain"
-          />
-        ) : (
-          <View style={s.placeholder}>
-            <Icon name="image" size={48} color={Colors.textMuted} />
-          </View>
-        )}
-      </View>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
-      {/* Caption */}
-      {photo?.caption ? (
-        <View style={s.captionWrap}>
-          <Text style={s.captionText}>{photo.caption}</Text>
+        {/* Photo */}
+        <View style={s.photoWrap}>
+          {photoUri ? (
+            <Image source={{ uri: photoUri }} style={s.photo} resizeMode="cover" />
+          ) : (
+            <View style={s.placeholder}>
+              <Icon name="image" size={48} color={Colors.textMuted} />
+            </View>
+          )}
+          {score !== undefined && (
+            <View style={s.scoreBadge}>
+              <Icon name="sparkles" size={12} color="#fff" />
+              <Text style={s.scoreText}>{score}</Text>
+            </View>
+          )}
         </View>
-      ) : null}
 
-      {/* Action buttons row */}
-      <View style={s.actionsRow}>
-        <TouchableOpacity style={s.actionItem} onPress={handleAnalyse}>
-          <View style={s.actionIcon}>
-            <Icon name="sparkles" size={20} color={Colors.accentPurple} />
+        {/* User row + caption (Instagram style) */}
+        <View style={s.metaSection}>
+          <View style={s.userRow}>
+            <View style={s.avatar}>
+              <Text style={s.avatarText}>{initial}</Text>
+            </View>
+            <View style={s.userInfo}>
+              <Text style={s.username}>{username}</Text>
+              {photo?.createdAt && (
+                <Text style={s.date}>{formatDate(photo.createdAt)}</Text>
+              )}
+            </View>
           </View>
-          <Text style={s.actionLabel}>Analyser</Text>
-        </TouchableOpacity>
 
-        <TouchableOpacity style={s.actionItem} onPress={handleEdit}>
-          <View style={s.actionIcon}>
-            <Icon name="sliders" size={20} color={Colors.accentBlue} />
-          </View>
-          <Text style={s.actionLabel}>Retoucher</Text>
-        </TouchableOpacity>
+          {photo?.caption ? (
+            <Text style={s.caption}>{photo.caption}</Text>
+          ) : null}
+        </View>
 
-        <TouchableOpacity style={s.actionItem} onPress={() => { hapticLight(); setShowShareModal(true); }}>
-          <View style={s.actionIcon}>
-            <Icon name="share" size={20} color={Colors.textSecondary} />
-          </View>
-          <Text style={s.actionLabel}>Partager</Text>
-        </TouchableOpacity>
+        {/* Divider */}
+        <View style={s.divider} />
 
-        <TouchableOpacity style={s.actionItem} onPress={handleDelete}>
-          <View style={s.actionIcon}>
-            <Icon name="trash" size={20} color="#FF6B6B" />
-          </View>
-          <Text style={s.actionLabel}>Supprimer</Text>
-        </TouchableOpacity>
-      </View>
+        {/* Actions */}
+        <View style={s.actionsRow}>
+          <TouchableOpacity style={s.actionItem} onPress={handleAnalyse}>
+            <View style={s.actionIcon}>
+              <Icon name="sparkles" size={20} color={Colors.accentPurple} />
+            </View>
+            <Text style={s.actionLabel}>Analyser</Text>
+          </TouchableOpacity>
 
-      {/* Import CTA */}
-      <View style={s.importWrap}>
-        <TouchableOpacity
-          style={s.importBtn}
-          onPress={handleImport}
-          activeOpacity={0.85}
-        >
-          <LinearGradient
-            colors={Gradients.brand as [string, string]}
-            style={s.importBtnGrad}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          >
-            <Text style={s.importBtnText}>Importer</Text>
-            <Icon name="chevron-right" size={18} color="#fff" />
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity style={s.actionItem} onPress={handleEdit}>
+            <View style={s.actionIcon}>
+              <Icon name="sliders" size={20} color={Colors.accentBlue} />
+            </View>
+            <Text style={s.actionLabel}>Retoucher</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={s.actionItem} onPress={() => { hapticLight(); setShowShareModal(true); }}>
+            <View style={s.actionIcon}>
+              <Icon name="share" size={20} color={Colors.textSecondary} />
+            </View>
+            <Text style={s.actionLabel}>Partager</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={s.actionItem} onPress={handleDelete}>
+            <View style={s.actionIcon}>
+              <Icon name="trash" size={20} color="#FF6B6B" />
+            </View>
+            <Text style={s.actionLabel}>Supprimer</Text>
+          </TouchableOpacity>
+        </View>
+
+      </ScrollView>
 
       <ShareCaptionModal
         visible={showShareModal}
@@ -358,66 +347,80 @@ export default function GalleryPhotoViewScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bgDeep },
+  scroll: { paddingBottom: 40 },
 
   photoWrap: {
-    flex: 1,
-    marginHorizontal: 16,
-    marginTop: 8,
-    borderRadius: 20,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    width: width,
+    height: PHOTO_HEIGHT,
     backgroundColor: "#0A0A14",
   },
   photo: { width: "100%", height: "100%" },
-  captionWrap: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+  placeholder: { flex: 1, alignItems: "center", justifyContent: "center" },
+
+  scoreBadge: {
+    position: "absolute",
+    top: 14,
+    right: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(123,47,190,0.85)",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
   },
-  captionText: {
+  scoreText: { fontFamily: Fonts.bold, fontSize: 13, color: "#fff" },
+
+  metaSection: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 4,
+    gap: 10,
+  },
+  userRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.accentPurple,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: { fontFamily: Fonts.bold, fontSize: 15, color: "#fff" },
+  userInfo: { gap: 1 },
+  username: { fontFamily: Fonts.semibold, fontSize: 14, color: Colors.textPrimary },
+  date: { fontFamily: Fonts.regular, fontSize: 12, color: Colors.textMuted },
+  caption: {
     fontFamily: Fonts.regular,
     fontSize: 14,
     color: Colors.textPrimary,
-    lineHeight: 20,
+    lineHeight: 21,
+    paddingLeft: 46,
   },
-  placeholder: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+
+  divider: {
+    height: 1,
+    backgroundColor: Colors.cardBorder,
+    marginHorizontal: 16,
+    marginVertical: 12,
   },
 
   actionsRow: {
     flexDirection: "row",
-    justifyContent: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    gap: 24,
+    justifyContent: "space-around",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   actionItem: { alignItems: "center", gap: 6 },
   actionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+    width: 52,
+    height: 52,
+    borderRadius: 16,
     backgroundColor: Colors.bgCard,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
     borderColor: Colors.cardBorder,
   },
-  actionLabel: {
-    fontSize: 11,
-    fontFamily: Fonts.medium,
-    color: Colors.textSecondary,
-  },
-
-  importWrap: { paddingHorizontal: 20, paddingBottom: 16 },
-  importBtn: { borderRadius: 16, overflow: "hidden" },
-  importBtnGrad: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 16,
-    gap: 8,
-  },
-  importBtnText: { fontSize: 16, fontFamily: Fonts.bold, color: "#fff" },
+  actionLabel: { fontSize: 11, fontFamily: Fonts.medium, color: Colors.textSecondary },
 });
