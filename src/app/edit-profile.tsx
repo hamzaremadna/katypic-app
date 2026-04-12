@@ -120,28 +120,47 @@ export default function EditProfileScreen() {
   }, [creative]);
 
   // ── Avatar upload ──────────────────────────────────────
-  const handlePickAvatar = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert(
-        "Permission requise",
-        "Autorisez l'accès à vos photos pour changer votre avatar."
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      const uri = result.assets[0].uri;
-      setAvatarUri(uri); // immediate preview
-      await uploadAvatar(uri);
-    }
+  const handlePickAvatar = () => {
+    Alert.alert("Photo de profil", "Choisissez une option", [
+      { text: "Annuler", style: "cancel" },
+      {
+        text: "📷  Prendre une photo",
+        onPress: async () => {
+          const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ["images"],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+          });
+          if (!result.canceled && result.assets[0]) {
+            const uri = result.assets[0].uri;
+            setAvatarUri(uri);
+            await uploadAvatar(uri);
+          }
+        },
+      },
+      {
+        text: "🖼️  Depuis la galerie",
+        onPress: async () => {
+          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (!perm.granted) {
+            Alert.alert("Permission requise", "Autorisez l'accès à vos photos pour changer votre avatar.");
+            return;
+          }
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ["images"],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+          });
+          if (!result.canceled && result.assets[0]) {
+            const uri = result.assets[0].uri;
+            setAvatarUri(uri);
+            await uploadAvatar(uri);
+          }
+        },
+      },
+    ]);
   };
 
   const uploadAvatar = async (uri: string) => {
@@ -355,16 +374,6 @@ export default function EditProfileScreen() {
                     <Icon name="camera" size={18} color="#fff" />
                   )}
                 </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => { hapticLight(); handlePickAvatar(); }}
-                disabled={avatarUploading}
-                style={s.changePhotoBtn}
-              >
-                <Text style={s.changePhotoText}>
-                  {avatarUploading ? "Envoi en cours..." : "Changer la photo"}
-                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity

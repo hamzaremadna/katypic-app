@@ -342,24 +342,23 @@ export default function AISelectionScreen() {
         </View>
       </Animated.View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={s.scroll}
-      >
-        {isLoading ? (
-          <ActivityIndicator
-            color={Colors.accentPink}
-            style={{ marginTop: 40 }}
-          />
-        ) : filteredPhotos.length === 0 ? (
-          <View style={s.empty}>
-            <Icon name="sparkles" size={36} color={Colors.textMuted} />
-            <Text style={s.emptyText}>Aucune anomalie détectée 🎉</Text>
-            <Text style={s.emptySubtext}>
-              Toutes tes photos ont l'air en bonne forme !
-            </Text>
-          </View>
-        ) : (
+      {isLoading ? (
+        <View style={s.centered}>
+          <ActivityIndicator color={Colors.accentPink} size="large" />
+        </View>
+      ) : filteredPhotos.length === 0 ? (
+        <View style={s.centered}>
+          <Icon name="sparkles" size={48} color={Colors.accentPink} />
+          <Text style={s.emptyText}>Aucune anomalie détectée 🎉</Text>
+          <Text style={s.emptySubtext}>
+            Toutes tes photos ont l'air en bonne forme !
+          </Text>
+        </View>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.scroll}
+        >
           <View style={s.photoGrid}>
             {filteredPhotos.map((photo, i) => (
               <PhotoCell
@@ -371,9 +370,9 @@ export default function AISelectionScreen() {
               />
             ))}
           </View>
-        )}
-        <View style={{ height: 100 }} />
-      </ScrollView>
+          <View style={{ height: 100 }} />
+        </ScrollView>
+      )}
 
     </View>
   );
@@ -447,11 +446,12 @@ const s = StyleSheet.create({
     gap: 12,
   },
 
-  // Empty state
-  empty: {
+  centered: {
+    flex: 1,
     alignItems: "center",
-    paddingTop: 60,
-    gap: 10,
+    justifyContent: "center",
+    gap: 12,
+    paddingHorizontal: 40,
   },
   emptyText: {
     fontSize: 16,

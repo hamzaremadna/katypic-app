@@ -222,10 +222,21 @@ async function pickImageAndAnalyse(router: ReturnType<typeof useRouter>) {
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ["images"],
     allowsEditing: false,
+    allowsMultipleSelection: true,
     quality: 0.9,
   });
-  if (!result.canceled && result.assets[0]) {
-    navigate(`/analyse/result?photoUri=${encodeURIComponent(result.assets[0].uri)}`);
+  if (!result.canceled && result.assets.length > 0) {
+    if (result.assets.length > 1) {
+      Alert.alert(
+        `${result.assets.length} photos sélectionnées`,
+        "Chaque photo sera analysée séparément. Commençons par la première !",
+        [{ text: "OK", onPress: () =>
+          navigate(`/analyse/result?photoUri=${encodeURIComponent(result.assets[0].uri)}`)
+        }]
+      );
+    } else {
+      navigate(`/analyse/result?photoUri=${encodeURIComponent(result.assets[0].uri)}`);
+    }
   }
 }
 
@@ -333,16 +344,8 @@ export default function AnalyseImportScreen() {
               colors={Gradients.purpleBlue}
               style={s.actionBtnGradient}
             >
-              <Text style={s.actionBtnText}>Prendre une  photo</Text>
+              <Text style={s.actionBtnText}>Prendre une photo</Text>
             </LinearGradient>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.actionBtn, s.actionBtnDark]}
-            onPress={() => pickImageAndAnalyse(router)}
-          >
-            <Text style={s.actionBtnTextDark}>
-              Importer  à partir de l'application
-            </Text>
           </TouchableOpacity>
         </View>
 

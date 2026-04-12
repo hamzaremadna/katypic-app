@@ -352,6 +352,21 @@ export default function DiscoverScreen() {
           <Icon name={mapType === "standard" ? "globe" : "map"} size={16} color="#FFFFFF" />
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={styles.locateMeBtn}
+          onPress={() => {
+            hapticLight();
+            mapRef.current?.animateToRegion({
+              latitude: userLocation.lat,
+              longitude: userLocation.lng,
+              latitudeDelta: 0.02,
+              longitudeDelta: 0.02,
+            }, 500);
+          }}
+        >
+          <Icon name="marker-pin" size={16} color="#FFFFFF" />
+        </TouchableOpacity>
+
         <MapView
           ref={mapRef}
           style={styles.map}
@@ -562,6 +577,20 @@ const styles = StyleSheet.create({
 
   mapContainer: { borderRadius: 20, flex: 1, overflow: "hidden" },
   map: { flex: 1 },
+  locateMeBtn: {
+    position: "absolute",
+    top: 58,
+    right: 12,
+    zIndex: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: "rgba(233,30,140,0.75)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
   mapTypeBtn: {
     position: "absolute",
     top: 12,

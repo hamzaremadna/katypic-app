@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Linking,
 } from "react-native";
+import { Accelerometer } from "expo-sensors";
 import { LinearGradient } from "expo-linear-gradient";
 import { CameraView, useCameraPermissions, CameraType } from "expo-camera";
 import { StatusBar } from "expo-status-bar";
@@ -216,6 +217,90 @@ const grid = StyleSheet.create({
 });
 
 // ─────────────────────────────────────────────
+// Level Indicator
+// ─────────────────────────────────────────────
+function LevelIndicator({ tilt }: { tilt: number }) {
+  const isLevel = Math.abs(tilt) < 2;
+  const showArrow = Math.abs(tilt) > 5;
+  const lineColor = isLevel ? "#4CD964" : "rgba(255,255,255,0.85)";
+
+  return (
+    <View style={lv.container} pointerEvents="none">
+      {/* Tilting bar */}
+      <View style={lv.barWrap}>
+        <View
+          style={[
+            lv.bar,
+            { borderColor: lineColor, transform: [{ rotate: `${-tilt}deg` }] },
+          ]}
+        />
+        <View style={[lv.centerDot, { backgroundColor: lineColor }]} />
+      </View>
+      {/* Directional hint */}
+      {showArrow && (
+        <View style={[lv.arrow, tilt > 0 ? lv.arrowRight : lv.arrowLeft]}>
+          <Text style={lv.arrowText}>{tilt > 0 ? "← inclinez gauche" : "inclinez droite →"}</Text>
+        </View>
+      )}
+      {isLevel && (
+        <View style={lv.levelBadge}>
+          <Text style={lv.levelText}>Niveau ✓</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const lv = StyleSheet.create({
+  container: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    pointerEvents: "none",
+  },
+  barWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 120,
+    height: 40,
+  },
+  bar: {
+    width: 100,
+    height: 0,
+    borderTopWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.85)",
+  },
+  centerDot: {
+    position: "absolute",
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "rgba(255,255,255,0.85)",
+  },
+  arrow: {
+    position: "absolute",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  arrowLeft: { top: "48%", left: 24 },
+  arrowRight: { top: "48%", right: 24 },
+  arrowText: { color: "#fff", fontSize: 11, fontWeight: "600" },
+  levelBadge: {
+    position: "absolute",
+    bottom: -22,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: "rgba(76,217,100,0.25)",
+    borderWidth: 1,
+    borderColor: "rgba(76,217,100,0.5)",
+  },
+  levelText: { color: "#4CD964", fontSize: 11, fontWeight: "600" },
+});
+
+// ─────────────────────────────────────────────
 // Camera Mode Options
 // ─────────────────────────────────────────────
 
@@ -230,7 +315,18 @@ export default function CameraScreen() {
   const [showGrid, setShowGrid] = useState(false);
   const [isProMode, setIsProMode] = useState(true);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [tilt, setTilt] = useState(0);
   const cameraRef = useRef<CameraView>(null);
+
+  // ── Level indicator ──────────────────────────────────────
+  useEffect(() => {
+    Accelerometer.setUpdateInterval(150);
+    const sub = Accelerometer.addListener(({ x, y }) => {
+      const angle = Math.atan2(x, -y) * (180 / Math.PI);
+      setTilt(Math.round(angle));
+    });
+    return () => sub.remove();
+  }, []);
 
   // ── Tour ──────────────────────────────────────────────
   const { markSeen, load } = useTourStore();
@@ -441,12 +537,26 @@ export default function CameraScreen() {
         {/* Grid overlay */}
         {showGrid && <GridOverlay />}
 
+        {/* Level indicator — always visible, center of viewfinder */}
+        <LevelIndicator tilt={tilt} />
+
         {/* Top Bar */}
         <View style={s.topBar}>
           <LinearGradient
             colors={["rgba(10,10,20,0.7)", "transparent"]}
             style={StyleSheet.absoluteFillObject}
           />
+          {/* Back button */}
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={s.topBtn}
+            activeOpacity={0.7}
+          >
+            <View style={s.topBtnBg}>
+              <Icon name="arrow-left" size={18} color="#FFFFFF" />
+            </View>
+          </TouchableOpacity>
+
           {/* Assistant Magique Button */}
           <TouchableOpacity
             activeOpacity={0.85}
