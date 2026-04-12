@@ -41,3 +41,39 @@ export function useDeletePhoto() {
     },
   });
 }
+
+export function useBatchDeletePhotos() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (photoIds: string[]) =>
+      photoApi.batchDelete(photoIds).then((r) => r.data),
+    onMutate: async (photoIds: string[]) => {
+      // Cancel in-flight fetches to avoid race conditions
+      await queryClient.cancelQueries({ queryKey: ["photos"] });
+      // Snapshot current cache for rollback
+      const previous = queryClient.getQueriesData({ queryKey: ["photos"] });
+      // Optimistically remove deleted photos from all pages in cache
+      queryClient.setQueriesData(
+        { queryKey: ["photos"] },
+        (old: { photos: { id: string }[]; total: number } | undefined) => {
+          if (!old) return old;
+          const ids = new Set(photoIds);
+          const photos = old.photos.filter((p) => !ids.has(p.id));
+          return { ...old, photos, total: old.total - (old.photos.length - photos.length) };
+        },
+      );
+      return { previous };
+    },
+    onError: (_err, _ids, context) => {
+      // Revert optimistic update on failure
+      if (context?.previous) {
+        for (const [queryKey, data] of context.previous) {
+          queryClient.setQueryData(queryKey, data);
+        }
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["photos"] });
+    },
+  });
+}

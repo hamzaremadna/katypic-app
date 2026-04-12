@@ -17,7 +17,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { Icon } from "../../components/ui/Icon";
 import { Colors, Gradients } from "../../theme/colors";
 import { KaytiHeader, BottomTabBar } from "../../components/ui";
-import { usePhotos, useDeletePhoto } from "../../hooks/usePhotos";
+import { usePhotos, useBatchDeletePhotos } from "../../hooks/usePhotos";
 import { Photo } from "../../services/api/photo.api";
 import { hapticLight, hapticMedium, hapticHeavy } from "../../utils/haptics";
 
@@ -49,7 +49,7 @@ export default function GalleryScreen() {
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
   const photos: Photo[] = data?.photos ?? [];
   const totalCount = data?.total ?? 0;
-  const deletePhoto = useDeletePhoto();
+  const batchDelete = useBatchDeletePhotos();
 
   const toggleSelectionMode = useCallback(() => {
     setSelectionMode((prev) => {
@@ -122,20 +122,18 @@ export default function GalleryScreen() {
           onPress: async () => {
             hapticHeavy();
             const ids = Array.from(selectedIds);
-            const results = await Promise.allSettled(
-              ids.map((id) => deletePhoto.mutateAsync(id)),
-            );
-            const failed = results.filter((r) => r.status === "rejected");
-            if (failed.length > 0) {
-              Alert.alert("Erreur", `${failed.length} photo(s) n'ont pas pu être supprimées.`);
-            }
             setSelectedIds(new Set());
             setSelectionMode(false);
+            try {
+              await batchDelete.mutateAsync(ids);
+            } catch {
+              Alert.alert("Erreur", "Certaines photos n'ont pas pu être supprimées.");
+            }
           },
         },
       ],
     );
-  }, [selectedIds, deletePhoto]);
+  }, [selectedIds, batchDelete]);
 
   const profileCount = useMemo(() => photos.filter((p) => p.isPublic).length, [photos]);
 

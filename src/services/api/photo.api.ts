@@ -64,6 +64,9 @@ export const photoApi = {
 
   delete: (photoId: string) => api.delete(`/photos/${photoId}`),
 
+  batchDelete: (photoIds: string[]) =>
+    api.delete<{ deleted: number; notFound: number }>("/photos/batch", { data: { photoIds } }),
+
   /** Multipart file upload for local dev mode */
   uploadFile: (formData: FormData) =>
     api.post<{ key: string; publicUrl: string }>("/photos/upload-file", formData, {
