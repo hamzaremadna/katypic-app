@@ -14,13 +14,16 @@ import {
   PanResponder,
   GestureResponderEvent,
   PanResponderGestureState,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Share,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as MediaLibrary from "expo-media-library";
-import * as Sharing from "expo-sharing";
 import ViewShot from "react-native-view-shot";
 import {
   Brightness,
@@ -387,6 +390,125 @@ function CropOverlay({ selectedRatio, isFreeCrop, freeCropBox, setFreeCropBox, s
 }
 
 // ─────────────────────────────────────────────
+// Share Caption Modal
+// ─────────────────────────────────────────────
+function ShareCaptionModal({
+  visible,
+  photoUri,
+  onClose,
+}: {
+  visible: boolean;
+  photoUri: string | null;
+  onClose: () => void;
+}) {
+  const [caption, setCaption] = useState("");
+  const [isSending, setIsSending] = useState(false);
+
+  const handleConfirmShare = async () => {
+    hapticMedium();
+    setIsSending(true);
+    try {
+      const message = caption.trim()
+        ? `${caption.trim()}\n\nDécouvrez KaytiPic !`
+        : "Découvrez cette photo sur KaytiPic !";
+      await Share.share({ message, url: photoUri ?? "" });
+    } catch {
+      // user cancelled
+    } finally {
+      setIsSending(false);
+      setCaption("");
+      onClose();
+    }
+  };
+
+  const handleClose = () => {
+    hapticLight();
+    setCaption("");
+    onClose();
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
+      <KeyboardAvoidingView
+        style={smc.backdrop}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={handleClose} />
+        <View style={smc.sheet}>
+          <LinearGradient colors={["#0E0A24", "#080814"]} style={StyleSheet.absoluteFillObject} />
+          <View style={smc.handle} />
+          <Text style={smc.title}>Partager la photo</Text>
+          {photoUri ? (
+            <Image source={{ uri: photoUri }} style={smc.thumb} resizeMode="cover" />
+          ) : null}
+          <Text style={smc.label}>LÉGENDE</Text>
+          <TextInput
+            style={smc.input}
+            value={caption}
+            onChangeText={setCaption}
+            placeholder="Écrire une légende..."
+            placeholderTextColor={Colors.textMuted}
+            multiline
+            maxLength={300}
+            autoFocus={false}
+          />
+          <Text style={smc.charCount}>{caption.length}/300</Text>
+          <TouchableOpacity
+            style={smc.shareBtn}
+            onPress={handleConfirmShare}
+            activeOpacity={0.85}
+            disabled={isSending}
+          >
+            <LinearGradient
+              colors={Gradients.brand as [string, string]}
+              style={smc.shareBtnGrad}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Icon name="share" size={18} color="#fff" />
+              <Text style={smc.shareBtnText}>Partager</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+          <TouchableOpacity style={smc.cancelBtn} onPress={handleClose}>
+            <Text style={smc.cancelText}>Annuler</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+const smc = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
+  sheet: {
+    borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: "hidden",
+    paddingHorizontal: 24, paddingTop: 16,
+    paddingBottom: Platform.OS === "ios" ? 36 : 24,
+    gap: 12, borderWidth: 1, borderColor: Colors.cardBorder,
+  },
+  handle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.2)", alignSelf: "center", marginBottom: 4,
+  },
+  title: { fontFamily: Fonts.bold, fontSize: 17, color: Colors.textPrimary, textAlign: "center" },
+  thumb: { width: "100%", height: 180, borderRadius: 16, backgroundColor: Colors.bgCard },
+  label: { fontFamily: Fonts.bold, fontSize: 11, color: Colors.accentPurple, letterSpacing: 1.5 },
+  input: {
+    backgroundColor: Colors.bgCard, borderRadius: 12,
+    paddingHorizontal: 16, paddingVertical: 14,
+    fontFamily: Fonts.regular, fontSize: 15, color: Colors.textPrimary,
+    borderWidth: 1, borderColor: Colors.cardBorder,
+    minHeight: 80, textAlignVertical: "top",
+  },
+  charCount: { fontFamily: Fonts.regular, fontSize: 11, color: Colors.textMuted, textAlign: "right" },
+  shareBtn: { borderRadius: 14, overflow: "hidden" },
+  shareBtnGrad: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14 },
+  shareBtnText: { fontFamily: Fonts.bold, fontSize: 16, color: "#fff" },
+  cancelBtn: { alignItems: "center", paddingVertical: 4 },
+  cancelText: { fontFamily: Fonts.regular, fontSize: 15, color: Colors.textMuted },
+});
+
+// ─────────────────────────────────────────────
 // Main Editor Screen
 // ─────────────────────────────────────────────
 export default function RetoucheScreen() {
@@ -395,6 +517,7 @@ export default function RetoucheScreen() {
   const photoUri = params.photoUri || "";
 
   const [screenMode, setScreenMode] = useState<ScreenMode>("edit");
+  const [showShareModal, setShowShareModal] = useState(false);
   const [savedUri, setSavedUri] = useState("");
 
   // Edit state
@@ -568,10 +691,10 @@ export default function RetoucheScreen() {
     }
   }, [photoUri, rotation, flipH, flipV, selectedRatio, adjustments]);
 
-  const handleShare = useCallback(async () => {
+  const handleShare = useCallback(() => {
     if (!savedUri) return;
-    if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(savedUri);
-    else Alert.alert("Partage non disponible");
+    hapticLight();
+    setShowShareModal(true);
   }, [savedUri]);
 
   const handleReset = useCallback(() => {
@@ -594,6 +717,11 @@ export default function RetoucheScreen() {
       <View style={ss.container}>
         <StatusBar style="light" />
         <LinearGradient colors={["#0E0A24", "#080814"]} style={StyleSheet.absoluteFillObject} />
+        <ShareCaptionModal
+          visible={showShareModal}
+          photoUri={savedUri}
+          onClose={() => setShowShareModal(false)}
+        />
         <KaytiHeader showBack title="Enregistrement effectué" onBack={() => setScreenMode("edit")} />
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={ss.scroll}>
