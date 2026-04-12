@@ -1,5 +1,6 @@
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
+import { router } from "expo-router";
 
 const _rawApiUrl =
   process.env.EXPO_PUBLIC_API_URL ||
@@ -59,7 +60,7 @@ apiClient.interceptors.response.use(
   async (error) => {
     const config = error.config;
 
-    // Handle 401: clear token and force logout
+    // Handle 401: clear token, force logout, and navigate to login
     if (error.response?.status === 401) {
       await SecureStore.deleteItemAsync("accessToken");
       delete apiClient.defaults.headers.common.Authorization;
@@ -67,7 +68,8 @@ apiClient.interceptors.response.use(
       const { useAuthStore } = require("../../stores/authStore");
       const state = useAuthStore.getState();
       if (state.isAuthenticated) {
-        state.logout();
+        await state.logout();
+        router.replace("/(auth)/login");
       }
       return Promise.reject(error);
     }
